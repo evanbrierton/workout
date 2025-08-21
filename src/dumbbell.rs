@@ -7,14 +7,6 @@ use crate::{bar::Bar, plate::Plate};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct DumbbellId(pub usize);
 
-impl Default for &DumbbellId {
-    fn default() -> Self {
-impl Default for DumbbellId {
-    fn default() -> Self {
-        DumbbellId(0)
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 
 pub struct Dumbbell {

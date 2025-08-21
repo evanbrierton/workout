@@ -63,9 +63,6 @@ impl Gym {
         }
     }
 
-    /**
-     * # Errors
-     * If it is impossible to construct a dumbbell for a requirement given the user's plates.
     ///
     /// # Errors
     /// If it is impossible to construct a dumbbell for a requirement given the user's plates.
@@ -84,7 +81,7 @@ impl Gym {
                 let (bar, id) = bars
                     .iter()
                     .map(|bar| {
-                        let start = bar_states.get(bar).unwrap_or_default();
+                        let start = bar_states.get(bar).unwrap_or(&DumbbellId(0));
                         (bar, self.path(*start, bar, req.weight))
                     })
                     .filter_map(|(bar, path)| {
