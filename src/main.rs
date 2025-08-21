@@ -30,7 +30,7 @@ fn main() -> anyhow::Result<()> {
 
     let plates = small_plates
         .into_iter()
-        .chain(big_plates.into_iter())
+        .chain(big_plates)
         .collect::<HashMap<_, _>>();
 
     let bars = vec![
@@ -44,8 +44,8 @@ fn main() -> anyhow::Result<()> {
     let grouped_requirements = args
         .requirements
         .iter()
-        .fold(HashMap::new(), |mut acc, req| {
-            acc.entry(req.bar_kind).or_insert_with(Vec::new).push(*req);
+        .fold(HashMap::<_, Vec<_>>::new(), |mut acc, req| {
+            acc.entry(req.bar_kind).or_default().push(*req);
             acc
         });
 
@@ -70,9 +70,9 @@ fn main() -> anyhow::Result<()> {
         false => {
             let ordered_dumbbells = gym.order(&grouped_requirements)?;
             for (bar, dumbbells) in ordered_dumbbells {
-                println!("{}", bar);
+                println!("{bar}");
                 for dumbbell in dumbbells {
-                    println!("  - {}", dumbbell);
+                    println!("  - {dumbbell}");
                 }
             }
 

@@ -1,41 +1,33 @@
 use std::{collections::HashMap, iter::Sum};
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub struct Plate {
     weight: u32,
     gauge: u32,
 }
 
 impl Plate {
-    pub fn new(weight: u32, gauge: u32) -> Self {
+    #[must_use] pub fn new(weight: u32, gauge: u32) -> Self {
         Plate { weight, gauge }
     }
 
-    pub fn weight(&self) -> u32 {
+    #[must_use] pub fn weight(&self) -> u32 {
         self.weight
     }
 
-    pub fn gauge(&self) -> u32 {
+    #[must_use] pub fn gauge(&self) -> u32 {
         self.gauge
     }
 
-    pub fn from_weights(weights: Vec<u32>, gauge: u32) -> Vec<Plate> {
+    #[must_use] pub fn from_weights(weights: Vec<u32>, gauge: u32) -> Vec<Plate> {
         weights.into_iter().map(|w| Plate::new(w, gauge)).collect()
     }
 
-    pub fn from_weights_map(weights_map: HashMap<u32, usize>, gauge: u32) -> HashMap<Plate, usize> {
+    #[must_use] pub fn from_weights_map(weights_map: HashMap<u32, usize>, gauge: u32) -> HashMap<Plate, usize> {
         weights_map
             .into_iter()
             .map(|(weight, count)| (Plate::new(weight, gauge), count))
             .collect()
-    }
-}
-
-impl Ord for Plate {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.weight
-            .cmp(&other.weight)
-            .then_with(|| self.gauge.cmp(&other.gauge))
     }
 }
 

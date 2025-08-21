@@ -1,25 +1,18 @@
-use std::{fmt::Display, str::FromStr};
+use core::{fmt::Display, str::FromStr};
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub enum BarKind {
     Dumbbell,
     Barbell,
 }
 
 impl BarKind {
+    #[must_use]
     pub fn required_similar_plates(&self) -> usize {
         match self {
             BarKind::Dumbbell => 4,
             BarKind::Barbell => 2,
         }
-    }
-}
-
-impl Ord for BarKind {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other
-            .required_similar_plates()
-            .cmp(&self.required_similar_plates())
     }
 }
 
