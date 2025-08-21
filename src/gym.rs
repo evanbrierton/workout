@@ -20,7 +20,7 @@ pub struct Gym {
 }
 
 impl Gym {
-    pub fn new(plates: &HashMap<Plate, usize>, bars: &[Bar]) -> Self {
+    #[must_use] pub fn new(plates: &HashMap<Plate, usize>, bars: &[Bar]) -> Self {
         let dumbbells: HashMap<Bar, Vec<Dumbbell>> = bars
             .iter()
             .map(|bar| (*bar, Self::dumbells(plates, bar)))
@@ -63,6 +63,10 @@ impl Gym {
         }
     }
 
+    /**
+     * # Errors
+     * If it is impossible to construct a dumbbell for a requirement given the user's plates.
+     */
     pub fn order(
         &self,
         requirements: &HashMap<BarKind, Vec<Requirement>>,
@@ -78,7 +82,7 @@ impl Gym {
                     .iter()
                     .map(|bar| {
                         let start = bar_states.get(bar).unwrap_or_default();
-                        (bar, self.path(start, bar, req.weight))
+                        (bar, self.path(*start, bar, req.weight))
                     })
                     .filter_map(|(bar, path)| {
                         path.map(|(weight, id)| (bar, (weight, id)))
@@ -87,9 +91,9 @@ impl Gym {
                     .map(|(bar, (_, id))| (bar, id))
                     .ok_or_else(|| {
                         anyhow::anyhow!(
-                            "No path found for {} with required weight {}",
-                            bar_kind,
-                            req.weight
+                            "There is no dumbbell for requirement {:?} with bar kind {:?}",
+                            req,
+                            bar_kind
                         )
                     })?;
 
@@ -102,13 +106,13 @@ impl Gym {
     }
 
 
-    pub fn weights(&self) -> HashMap<Bar, Vec<u32>> {
+    #[must_use] pub fn weights(&self) -> HashMap<Bar, Vec<u32>> {
         self.dumbbells
             .iter()
             .map(|(bar, dumbbells)| {
                 let weights = dumbbells
                     .iter()
-                    .map(|dumbbell| dumbbell.weight())
+                    .map(Dumbbell::weight)
                     .sorted()
                     .dedup()
                     .collect();
@@ -119,13 +123,13 @@ impl Gym {
 
     fn path(
         &self,
-        start: &DumbbellId,
+        start: DumbbellId,
         bar: &Bar,
         target_weight: u32,
     ) -> Option<(u32, DumbbellId)> {
         let graph = self.graphs.get(bar)?;
         let nodes = self.nodes.get(bar)?;
-        let start_node = nodes.get(start)?;
+        let start_node = nodes.get(&start)?;
 
         let path = algo::astar(
             graph,
@@ -173,23 +177,19 @@ impl Gym {
         }
 
         for ((i1, d1), (i2, d2)) in dumbbells.iter().enumerate().tuple_combinations() {
-            if d1.weight() == d2.weight() {
-                continue;
-            }
-
             let d1_plates = d1.plates();
             let d2_plates = d2.plates();
 
-            if (d1_plates.len() as i32 - d2_plates.len() as i32).abs() == 1 {
+            if (d1_plates.len() as i128 - d2_plates.len() as i128).abs() == 1 {
                 let adjacent = d1_plates
                     .iter()
                     .zip(d2_plates)
                     .all(|(p1, p2)| p1.weight() == p2.weight());
 
                 if adjacent {
-                    let node1 = nodes[&DumbbellId(i1)];
-                    let node2 = nodes[&DumbbellId(i2)];
-                    graph.add_edge(node1, node2, 1);
+                    let n1 = nodes[&DumbbellId(i1)];
+                    let n2 = nodes[&DumbbellId(i2)];
+                    graph.add_edge(n1, n2, 1);
                 }
             }
         }

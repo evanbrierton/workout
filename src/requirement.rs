@@ -9,7 +9,7 @@ pub struct Requirement {
 }
 
 impl Requirement {
-    pub fn matches(&self, dumbbell: &Dumbbell) -> bool {
+    #[must_use] pub fn matches(&self, dumbbell: &Dumbbell) -> bool {
         self.weight == dumbbell.weight() && self.bar_kind == *dumbbell.bar().kind()
     }
 }
@@ -23,9 +23,16 @@ impl FromStr for Requirement {
             .parse::<f64>()
             .map_err(|_| "Invalid weight".to_string())?;
         let bar_kind = BarKind::from_str(bar_kind.to_lowercase().as_str())?;
+
         Ok(Requirement {
-            weight: (weight * 1000.0) as u32,
+            weight: kgs_to_grams(weight),
             bar_kind,
         })
     }
+}
+
+fn kgs_to_grams(kgs: f64) -> u32 {
+    #![allow(clippy::cast_possible_truncation)]
+    #![allow(clippy::cast_sign_loss)]
+    (kgs * 1000.0) as u32
 }

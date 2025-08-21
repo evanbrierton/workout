@@ -1,4 +1,4 @@
-use std::{fmt::Display, str::FromStr};
+use core::{fmt::Display, str::FromStr};
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub enum BarKind {
@@ -7,6 +7,7 @@ pub enum BarKind {
 }
 
 impl BarKind {
+    #[must_use]
     pub fn required_similar_plates(&self) -> usize {
         match self {
             BarKind::Dumbbell => 4,

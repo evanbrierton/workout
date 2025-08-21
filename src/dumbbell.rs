@@ -21,7 +21,7 @@ pub struct Dumbbell {
 }
 
 impl Dumbbell {
-    pub fn new(plates: Vec<Plate>, bar: Bar) -> Self {
+    #[must_use] pub fn new(plates: Vec<Plate>, bar: Bar) -> Self {
         Dumbbell {
             plates: plates
                 .into_iter()
@@ -33,20 +33,20 @@ impl Dumbbell {
         }
     }
 
-    pub fn new_rc(plates: Vec<Plate>, bar: &Bar) -> Rc<Self> {
+    #[must_use] pub fn new_rc(plates: Vec<Plate>, bar: &Bar) -> Rc<Self> {
         Rc::new(Dumbbell::new(plates, *bar))
     }
 
-    pub fn plates(&self) -> &[Plate] {
+    #[must_use] pub fn plates(&self) -> &[Plate] {
         &self.plates
     }
 
-    pub fn bar(&self) -> &Bar {
+    #[must_use] pub fn bar(&self) -> &Bar {
         &self.bar
     }
 
-    pub fn weight(&self) -> u32 {
-        self.bar.weight() + self.plates.iter().map(|p| p.weight()).sum::<u32>() * 2
+    #[must_use] pub fn weight(&self) -> u32 {
+        self.bar.weight() + self.plates.iter().map(Plate::weight).sum::<u32>() * 2
     }
 }
 
@@ -67,7 +67,7 @@ impl Display for Dumbbell {
         let kg_plates = self
             .plates
             .iter()
-            .map(|p| p.weight() as f64 / 1000.0)
+            .map(|p| f64::from(p.weight()) / 1000.0)
             .collect::<Vec<_>>();
 
         write!(
@@ -76,7 +76,7 @@ impl Display for Dumbbell {
             self.bar.kind(),
             self.bar.gauge(),
             kg_plates,
-            self.weight() as f64 / 1000.0,
+            f64::from(self.weight()) / 1000.0,
         )
     }
 }
