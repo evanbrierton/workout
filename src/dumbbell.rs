@@ -4,7 +4,16 @@ use itertools::Itertools;
 
 use crate::{bar::Bar, plate::Plate};
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct DumbbellId(pub usize);
+
+impl Default for &DumbbellId {
+    fn default() -> Self {
+       &DumbbellId(0)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Hash)]
 
 pub struct Dumbbell {
     plates: Vec<Plate>,
@@ -38,6 +47,12 @@ impl Dumbbell {
 
     pub fn weight(&self) -> u32 {
         self.bar.weight() + self.plates.iter().map(|p| p.weight()).sum::<u32>() * 2
+    }
+}
+
+impl Ord for Dumbbell {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.weight().cmp(&other.weight())
     }
 }
 
