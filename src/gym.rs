@@ -66,7 +66,10 @@ impl Gym {
     /**
      * # Errors
      * If it is impossible to construct a dumbbell for a requirement given the user's plates.
-     */
+    ///
+    /// # Errors
+    /// If it is impossible to construct a dumbbell for a requirement given the user's plates.
+    ///
     pub fn order(
         &self,
         requirements: &HashMap<BarKind, Vec<Requirement>>,
