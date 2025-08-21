@@ -27,6 +27,7 @@ impl Gym {
             .iter()
             .map(|bar| (*bar, Self::dumbells(plates, bar)))
             .collect();
+
         let mut graphs = HashMap::new();
         let mut nodes = HashMap::new();
 
@@ -38,14 +39,14 @@ impl Gym {
 
         let zeroes: HashMap<Bar, Dumbbell> = bars
             .iter()
-            .map(|bar| (bar.clone(), Dumbbell::new(vec![], bar)))
+            .map(|bar| (*bar, Dumbbell::new(vec![], bar)))
             .collect();
 
         let bar_options: HashMap<BarKind, Vec<Bar>> =
             bars.iter().fold(HashMap::new(), |mut acc, bar| {
-                acc.entry(bar.kind().clone())
+                acc.entry(*bar.kind())
                     .or_insert_with(Vec::new)
-                    .push(bar.clone());
+                    .push(*bar);
                 acc
             });
 
@@ -84,9 +85,9 @@ impl Gym {
                     .map(|(bar, (_, dumbbell))| (bar, dumbbell))
                     .unwrap();
 
-                bar_states.insert(bar.clone(), dumbbell.clone());
+                bar_states.insert(*bar, dumbbell.clone());
                 result
-                    .entry(bar.clone())
+                    .entry(*bar)
                     .or_insert_with(Vec::new)
                     .push(dumbbell.clone());
             }
