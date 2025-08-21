@@ -1,8 +1,8 @@
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}, rc::Rc};
 
 use itertools::Itertools;
 use petgraph::{
-    graph::{NodeIndex, UnGraph}
+    algo, graph::{NodeIndex, UnGraph}
 };
 
 use crate::{
@@ -62,20 +62,21 @@ impl Gym {
     pub fn order(
         &self,
         requirements: &HashMap<BarKind, Vec<Requirement>>,
-    ) -> HashMap<Bar, Vec<Dumbbell>> {
-        let mut bar_states = self.zeroes.clone();
+    ) -> anyhow::Result<HashMap<Bar, Vec<Dumbbell>>> {
+        let mut bar_states = HashMap::new();
         let mut result = HashMap::new();
 
         for (bar_kind, reqs) in requirements {
-            let bars = self.bar_options.get(&bar_kind).unwrap();
+            let bars = &self.bar_options[bar_kind];
 
             for req in reqs {
                 let (bar, dumbbell) = bars
                     .iter()
                     .map(|bar| {
+                        let start = bar_states.get(bar).unwrap_or_else(|| &self.zeroes[bar]);
                         (
                             bar,
-                            self.path(bar_states.get(bar).unwrap(), bar, req.weight),
+                            self.path(start, bar, req.weight),
                         )
                     })
                     .filter_map(|(bar, path)| {
@@ -83,7 +84,13 @@ impl Gym {
                     })
                     .min_by_key(|(_, (weight, _))| *weight)
                     .map(|(bar, (_, dumbbell))| (bar, dumbbell))
-                    .unwrap();
+                    .ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "No path found for {} with required weight {}",
+                            bar_kind,
+                            req.weight
+                        )
+                    })?;
 
                 bar_states.insert(*bar, dumbbell.clone());
                 result
@@ -93,7 +100,7 @@ impl Gym {
             }
         }
 
-        result
+        Result::Ok(result)
     }
 
     pub fn weights (&self) -> HashMap<Bar, Vec<u32>> {
@@ -106,7 +113,7 @@ impl Gym {
                     .sorted()
                     .dedup()
                     .collect();
-                (bar.clone(), weights)
+                (*bar, weights)
             })
             .collect()
     }
@@ -116,7 +123,7 @@ impl Gym {
         let nodes = self.nodes.get(bar)?;
         let start_node = nodes.get(start)?;
 
-        let path = petgraph::algo::astar(
+        let path = algo::astar(
             graph,
             *start_node,
             |n| graph[n].weight() == target_weight,
@@ -124,8 +131,8 @@ impl Gym {
             |_| 0,
         )?;
 
-        let last_node_index = path.1.last().unwrap();
-        let last_node = graph.node_weight(*last_node_index).unwrap();
+        let last_node_index = path.1.last()?;
+        let last_node = graph.node_weight(*last_node_index)?;
         Option::Some((path.0, last_node))
     }
 
@@ -176,9 +183,9 @@ impl Gym {
                     .all(|(p1, p2)| p1.weight() == p2.weight());
 
                 if adjacent {
-                    let node1 = nodes.get(d1).unwrap();
-                    let node2 = nodes.get(d2).unwrap();
-                    graph.add_edge(*node1, *node2, 1);
+                    let node1 = nodes[d1];
+                    let node2 = nodes[d2];
+                    graph.add_edge(node1, node2, 1);
                 }
             }
         }

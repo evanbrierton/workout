@@ -23,7 +23,7 @@ impl Dumbbell {
                 .rev()
                 .filter(|p| p.gauge() == bar.gauge())
                 .collect(),
-            bar: bar.clone(),
+            bar: *bar,
         }
     }
 

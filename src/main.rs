@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use anyhow::Ok;
 use clap::Parser;
 use itertools::Itertools;
 use workout_rs::{
@@ -16,7 +17,7 @@ struct Args {
     requirements: Vec<Requirement>,
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     let small_plates = Plate::from_weights_map(HashMap::from([(500, 4), (1250, 4), (2500, 4)]), 1);
@@ -50,9 +51,9 @@ fn main() {
         .requirements
         .iter()
         .fold(HashMap::new(), |mut acc, req| {
-            acc.entry(req.bar_kind.clone())
+            acc.entry(req.bar_kind)
                 .or_insert_with(Vec::new)
-                .push(req.clone());
+                .push(*req);
             acc
         });
 
@@ -65,15 +66,19 @@ fn main() {
             for (bar, weights) in weights.iter().sorted() {
                 println!("{}: {:?}", bar, weights.iter().map(|w| *w as f64 / 1000.0).collect::<Vec<_>>());
             }
+
+            Ok(())
         }
         false => {
-            let ordered_dumbbells = gym.order(&grouped_requirements);
+            let ordered_dumbbells = gym.order(&grouped_requirements)?;
             for (bar, dumbbells) in ordered_dumbbells {
                 println!("{}", bar);
                 for dumbbell in dumbbells {
                     println!("  - {}", dumbbell);
                 }
             }
+
+            Ok(())
         }
     }
 }

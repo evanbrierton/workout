@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use crate::{bar_kind::BarKind, dumbbell::Dumbbell};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Requirement {
     pub weight: u32,
     pub bar_kind: BarKind,
