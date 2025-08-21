@@ -183,7 +183,7 @@ impl Gym {
             let d1_plates = d1.plates();
             let d2_plates = d2.plates();
 
-            if (d1_plates.len() as i128 - d2_plates.len() as i128).abs() == 1 {
+            if d1_plates.len().abs_diff(d2_plates.len()) == 1 {
                 let adjacent = d1_plates
                     .iter()
                     .zip(d2_plates)
