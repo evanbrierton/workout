@@ -1,6 +1,6 @@
-use std::{collections::HashMap, iter::Sum};
+use std::{collections::HashMap};
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Plate {
     weight: u32,
     gauge: u32,
@@ -33,13 +33,5 @@ impl Plate {
             .into_iter()
             .map(|(weight, count)| (Plate::new(weight, gauge), count))
             .collect()
-    }
-}
-
-impl Sum for Plate {
-    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(Plate::new(0, 0), |acc, plate| {
-            Plate::new(acc.weight + plate.weight, acc.gauge)
-        })
     }
 }

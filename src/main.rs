@@ -5,7 +5,7 @@ use clap::Parser;
 use itertools::Itertools;
 use workout_rs::{bar::Bar, bar_kind::BarKind, gym::Gym, plate::Plate, requirement::Requirement};
 
-#[derive(Parser, Debug)]
+#[derive(Parser)]
 struct Args {
     #[arg(value_parser = clap::value_parser!(Requirement))]
     requirements: Vec<Requirement>,
