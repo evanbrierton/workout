@@ -13,7 +13,7 @@ impl Default for &DumbbellId {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 
 pub struct Dumbbell {
     plates: Vec<Plate>,
@@ -47,6 +47,12 @@ impl Dumbbell {
 
     pub fn weight(&self) -> u32 {
         self.bar.weight() + self.plates.iter().map(|p| p.weight()).sum::<u32>() * 2
+    }
+}
+
+impl PartialOrd for Dumbbell {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 

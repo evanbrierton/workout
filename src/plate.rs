@@ -1,6 +1,6 @@
 use std::{collections::HashMap, iter::Sum};
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub struct Plate {
     weight: u32,
     gauge: u32,
@@ -28,14 +28,6 @@ impl Plate {
             .into_iter()
             .map(|(weight, count)| (Plate::new(weight, gauge), count))
             .collect()
-    }
-}
-
-impl Ord for Plate {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.weight
-            .cmp(&other.weight)
-            .then_with(|| self.gauge.cmp(&other.gauge))
     }
 }
 

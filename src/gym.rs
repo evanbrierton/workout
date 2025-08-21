@@ -51,7 +51,7 @@ impl Gym {
 
         let bar_options: HashMap<BarKind, Vec<Bar>> =
             bars.iter().fold(HashMap::new(), |mut acc, bar| {
-                acc.entry(*bar.kind()).or_insert_with(Vec::new).push(*bar);
+                acc.entry(*bar.kind()).or_default().push(*bar);
                 acc
             });
 
@@ -156,13 +156,12 @@ impl Gym {
         plates
             .iter()
             .powerset()
-            .into_iter()
             .map(|plates| Dumbbell::new(plates.into_iter().copied().collect(), *bar))
             .collect::<HashSet<_>>()
     }
 
     fn graph(
-        dumbbells: &Vec<Dumbbell>,
+        dumbbells: &[Dumbbell],
         ids: &HashSet<DumbbellId>,
     ) -> (UnGraph<DumbbellId, u32>, HashMap<DumbbellId, NodeIndex>) {
         let mut graph = UnGraph::<DumbbellId, u32>::new_undirected();
