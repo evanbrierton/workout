@@ -1,24 +1,29 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash};
 
 use clap::Parser;
+use petgraph::{
+    algo,
+    dot::{Config, Dot},
+};
 use workout_rs::{
-    bar::{Bar, BarType},
-    dumbbell::Dumbbell,
+    bar::Bar,
+    bar_kind::BarKind,
+    dumbbell::{self, Dumbbell},
+    gym::Gym,
     plate::Plate,
+    requirement::Requirement,
 };
 
 #[derive(Parser, Debug)]
 struct Args {
-    weight: Option<u32>,
+    #[arg(value_parser = clap::value_parser!(Requirement))]
+    requirements: Vec<Requirement>,
 }
 
 fn main() {
     let args = Args::parse();
 
-    let small_plates = Plate::from_weights_map(
-        HashMap::from([(500, 4), (1000, 4), (1250, 4), (2500, 4)]),
-        1,
-    );
+    let small_plates = Plate::from_weights_map(HashMap::from([(500, 4), (1250, 4), (2500, 4)]), 1);
 
     let big_plates = Plate::from_weights_map(
         HashMap::from([
@@ -27,7 +32,7 @@ fn main() {
             (5000, 2),
             (10000, 2),
             (15000, 2),
-            (25000, 2),
+            (20000, 2),
         ]),
         2,
     );
@@ -38,38 +43,44 @@ fn main() {
         .collect::<HashMap<_, _>>();
 
     let bars = vec![
-        Bar::new(1000, 1, BarType::Dumbbell),
-        Bar::new(5000, 2, BarType::Dumbbell),
-        Bar::new(15000, 2, BarType::Barbell),
+        Bar::new(2000, 1, BarKind::Dumbbell),
+        Bar::new(5000, 2, BarKind::Dumbbell),
+        Bar::new(15000, 2, BarKind::Barbell),
     ];
 
-    let dumbbells = Dumbbell::sort(
-        bars.into_iter()
-            .map(|bar| Dumbbell::available_from_weight_map(plates.clone(), bar.clone()))
-            .flatten()
-            .collect::<Vec<_>>(),
-    );
+    let gym = Gym::new(&plates, &bars);
 
-    match args.weight {
-        Some(w) => {
-            let filtered_dumbbells: Vec<Dumbbell> = dumbbells
-                .clone()
-                .into_iter()
-                .filter(|d| d.weight() == w * 1000)
-                .collect();
+    let grouped_requirements = args
+        .requirements
+        .iter()
+        .fold(HashMap::new(), |mut acc, req| {
+            acc.entry(req.bar_kind.clone())
+                .or_insert_with(Vec::new)
+                .push(req.clone());
+            acc
+        });
 
-            if filtered_dumbbells.is_empty() {
-                println!("No dumbbells found for weight: {}", w);
-                return;
-            }
+    match args.requirements.is_empty() {
+        true => {
+            let all_dumbbells: Vec<Dumbbell> = Dumbbell::sort_and_dedupe(
+                gym.dumbbells
+                    .values()
+                    .flat_map(|dumbbells_set| dumbbells_set.iter().cloned())
+                    .into_iter()
+                    .collect(),
+            );
 
-            for dumbbell in filtered_dumbbells {
+            for dumbbell in all_dumbbells {
                 println!("{}", dumbbell);
             }
         }
-        None => {
-            for dumbbell in dumbbells {
-                println!("{}", dumbbell);
+        false => {
+            let ordered_dumbbells = gym.order(grouped_requirements);
+            for (bar, dumbbells) in ordered_dumbbells {
+                println!("Bar: {}", bar);
+                for dumbbell in dumbbells {
+                    println!("  - {}", dumbbell);
+                }
             }
         }
     }

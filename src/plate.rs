@@ -25,7 +25,9 @@ impl Plate {
 
 impl Ord for Plate {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.weight.cmp(&other.weight).then_with(|| self.gauge.cmp(&other.gauge))
+        self.weight
+            .cmp(&other.weight)
+            .then_with(|| self.gauge.cmp(&other.gauge))
     }
 }
 
