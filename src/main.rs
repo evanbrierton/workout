@@ -1,14 +1,10 @@
-use std::{collections::HashMap, hash::Hash};
+use std::collections::HashMap;
 
 use clap::Parser;
-use petgraph::{
-    algo,
-    dot::{Config, Dot},
-};
 use workout_rs::{
     bar::Bar,
     bar_kind::BarKind,
-    dumbbell::{self, Dumbbell},
+    dumbbell::Dumbbell,
     gym::Gym,
     plate::Plate,
     requirement::Requirement,

@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    hash::Hash,
-};
+use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
 use petgraph::{
@@ -12,7 +9,7 @@ use petgraph::{
 use crate::{
     bar::Bar,
     bar_kind::BarKind,
-    dumbbell::{self, Dumbbell},
+    dumbbell::Dumbbell,
     plate::Plate,
     requirement::Requirement,
 };
