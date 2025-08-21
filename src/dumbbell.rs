@@ -9,7 +9,9 @@ pub struct DumbbellId(pub usize);
 
 impl Default for &DumbbellId {
     fn default() -> Self {
-       &DumbbellId(0)
+impl Default for DumbbellId {
+    fn default() -> Self {
+        DumbbellId(0)
     }
 }
 
