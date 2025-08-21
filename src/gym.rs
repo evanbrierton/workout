@@ -2,8 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
 use petgraph::{
-    graph::{NodeIndex, UnGraph},
-    visit::NodeRef,
+    graph::{NodeIndex, UnGraph}
 };
 
 use crate::{
@@ -15,7 +14,7 @@ use crate::{
 };
 
 pub struct Gym {
-    pub dumbbells: HashMap<Bar, HashSet<Dumbbell>>,
+    dumbbells: HashMap<Bar, HashSet<Dumbbell>>,
     graphs: HashMap<Bar, UnGraph<Dumbbell, u32>>,
     nodes: HashMap<Bar, HashMap<Dumbbell, NodeIndex>>,
     zeroes: HashMap<Bar, Dumbbell>,
@@ -26,25 +25,25 @@ impl Gym {
     pub fn new(plates: &HashMap<Plate, usize>, bars: &[Bar]) -> Self {
         let dumbbells: HashMap<Bar, HashSet<Dumbbell>> = bars
             .iter()
-            .map(|bar| (bar.clone(), Self::dumbells(plates.clone(), bar.clone())))
+            .map(|bar| (*bar, Self::dumbells(plates, bar)))
             .collect();
         let mut graphs = HashMap::new();
         let mut nodes = HashMap::new();
 
         for (bar, dumbbells_set) in &dumbbells {
             let (graph, node_map) = Self::tree(dumbbells_set);
-            graphs.insert(bar.clone(), graph);
-            nodes.insert(bar.clone(), node_map);
+            graphs.insert(*bar, graph);
+            nodes.insert(*bar, node_map);
         }
 
         let zeroes: HashMap<Bar, Dumbbell> = bars
             .iter()
-            .map(|bar| (bar.clone(), Dumbbell::new(vec![], bar.clone())))
+            .map(|bar| (bar.clone(), Dumbbell::new(vec![], bar)))
             .collect();
 
         let bar_options: HashMap<BarKind, Vec<Bar>> =
             bars.iter().fold(HashMap::new(), |mut acc, bar| {
-                acc.entry(bar.kind.clone())
+                acc.entry(bar.kind().clone())
                     .or_insert_with(Vec::new)
                     .push(bar.clone());
                 acc
@@ -61,7 +60,7 @@ impl Gym {
 
     pub fn order(
         &self,
-        requirements: HashMap<BarKind, Vec<Requirement>>,
+        requirements: &HashMap<BarKind, Vec<Requirement>>,
     ) -> HashMap<Bar, Vec<Dumbbell>> {
         let mut bar_states = self.zeroes.clone();
         let mut result = HashMap::new();
@@ -78,6 +77,9 @@ impl Gym {
                             self.path(bar_states.get(bar).unwrap(), bar, req.weight),
                         )
                     })
+                    .filter_map(|(bar, path)| {
+                        path.map(|(weight, dumbbell)| (bar, (weight, dumbbell)))
+                    })
                     .min_by_key(|(_, (weight, _))| *weight)
                     .map(|(bar, (_, dumbbell))| (bar, dumbbell))
                     .unwrap();
@@ -93,10 +95,25 @@ impl Gym {
         result
     }
 
-    fn path(&self, start: &Dumbbell, bar: &Bar, target_weight: u32) -> (u32, Dumbbell) {
-        let graph = self.graphs.get(bar).unwrap();
-        let nodes = self.nodes.get(bar).unwrap();
-        let start_node = nodes.get(start).unwrap();
+    pub fn weights (&self) -> HashMap<Bar, Vec<u32>> {
+        self.dumbbells
+            .iter()
+            .map(|(bar, dumbbells)| {
+                let weights = dumbbells
+                    .iter()
+                    .map(|dumbbell| dumbbell.weight())
+                    .sorted()
+                    .dedup()
+                    .collect();
+                (bar.clone(), weights)
+            })
+            .collect()
+    }
+
+    fn path(&self, start: &Dumbbell, bar: &Bar, target_weight: u32) -> Option<(u32, &Dumbbell)> {
+        let graph = self.graphs.get(bar)?;
+        let nodes = self.nodes.get(bar)?;
+        let start_node = nodes.get(start)?;
 
         let path = petgraph::algo::astar(
             graph,
@@ -104,33 +121,31 @@ impl Gym {
             |n| graph[n].weight() == target_weight,
             |e| *e.weight(),
             |_| 0,
-        )
-        .unwrap();
+        )?;
 
-        // give the last node in the path
         let last_node_index = path.1.last().unwrap();
         let last_node = graph.node_weight(*last_node_index).unwrap();
-        (path.0, last_node.clone())
+        Option::Some((path.0, last_node))
     }
 
-    fn dumbells(weights_map: HashMap<Plate, usize>, bar: Bar) -> HashSet<Dumbbell> {
+    fn dumbells(weights_map: &HashMap<Plate, usize>, bar: &Bar) -> HashSet<Dumbbell> {
         Self::available_dumbbells(
-            weights_map
-                .into_iter()
-                .filter(|(_, count)| *count >= bar.kind.required_similar_plates())
-                .map(|(plate, count)| (plate, count / bar.kind.required_similar_plates()))
+            &weights_map
+                .iter()
+                .filter(|(_, count)| *count >= &bar.kind().required_similar_plates())
+                .map(|(plate, count)| (*plate, count / bar.kind().required_similar_plates()))
                 .flat_map(|(plate, count)| vec![plate; count])
-                .collect(),
+                .collect::<Vec<_>>(),
             bar,
         )
     }
 
-    fn available_dumbbells(plates: Vec<Plate>, bar: Bar) -> HashSet<Dumbbell> {
+    fn available_dumbbells(plates: &[Plate], bar:&Bar) -> HashSet<Dumbbell> {
         plates
             .iter()
             .powerset()
             .into_iter()
-            .map(|plates| Dumbbell::new(plates.into_iter().copied().collect(), bar.clone()))
+            .map(|plates| Dumbbell::new(plates.into_iter().copied().collect(), bar))
             .collect()
     }
 
@@ -150,14 +165,14 @@ impl Gym {
                 continue;
             }
 
-            let d1_plates = d1.plates.clone();
-            let d2_plates = d2.plates.clone();
+            let d1_plates = d1.plates();
+            let d2_plates = d2.plates();
 
             if (d1_plates.len() as i32 - d2_plates.len() as i32).abs() == 1 {
                 let adjacent = d1_plates
                     .iter()
                     .zip(d2_plates)
-                    .all(|(p1, p2)| p1.weight == p2.weight);
+                    .all(|(p1, p2)| p1.weight() == p2.weight());
 
                 if adjacent {
                     let node1 = nodes.get(d1).unwrap();

@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use clap::Parser;
+use itertools::Itertools;
 use workout_rs::{
     bar::Bar,
     bar_kind::BarKind,
-    dumbbell::Dumbbell,
     gym::Gym,
     plate::Plate,
     requirement::Requirement,
@@ -56,24 +56,20 @@ fn main() {
             acc
         });
 
+
     match args.requirements.is_empty() {
         true => {
-            let all_dumbbells: Vec<Dumbbell> = Dumbbell::sort_and_dedupe(
-                gym.dumbbells
-                    .values()
-                    .flat_map(|dumbbells_set| dumbbells_set.iter().cloned())
-                    .into_iter()
-                    .collect(),
-            );
+            let weights = gym.weights();
 
-            for dumbbell in all_dumbbells {
-                println!("{}", dumbbell);
+            println!("Available weights:");
+            for (bar, weights) in weights.iter().sorted() {
+                println!("{}: {:?}", bar, weights.iter().map(|w| *w as f64 / 1000.0).collect::<Vec<_>>());
             }
         }
         false => {
-            let ordered_dumbbells = gym.order(grouped_requirements);
+            let ordered_dumbbells = gym.order(&grouped_requirements);
             for (bar, dumbbells) in ordered_dumbbells {
-                println!("Bar: {}", bar);
+                println!("{}", bar);
                 for dumbbell in dumbbells {
                     println!("  - {}", dumbbell);
                 }

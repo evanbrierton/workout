@@ -1,6 +1,6 @@
 use std::{fmt::Display, str::FromStr};
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Hash)]
 pub enum BarKind {
     Dumbbell,
     Barbell,

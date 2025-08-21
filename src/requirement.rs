@@ -10,7 +10,7 @@ pub struct Requirement {
 
 impl Requirement {
     pub fn matches(&self, dumbbell: &Dumbbell) -> bool {
-        self.weight == dumbbell.weight() && self.bar_kind == dumbbell.bar.kind
+        self.weight == dumbbell.weight() && self.bar_kind == *dumbbell.bar().kind()
     }
 }
 

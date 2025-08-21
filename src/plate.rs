@@ -2,13 +2,21 @@ use std::{collections::HashMap, iter::Sum};
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Hash)]
 pub struct Plate {
-    pub weight: u32,
-    pub gauge: u32,
+    weight: u32,
+    gauge: u32,
 }
 
 impl Plate {
     pub fn new(weight: u32, gauge: u32) -> Self {
         Plate { weight, gauge }
+    }
+
+    pub fn weight(&self) -> u32 {
+        self.weight
+    }
+
+    pub fn gauge(&self) -> u32 {
+        self.gauge
     }
 
     pub fn from_weights(weights: Vec<u32>, gauge: u32) -> Vec<Plate> {
