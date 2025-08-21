@@ -3,13 +3,7 @@ use std::collections::HashMap;
 use anyhow::Ok;
 use clap::Parser;
 use itertools::Itertools;
-use workout_rs::{
-    bar::Bar,
-    bar_kind::BarKind,
-    gym::Gym,
-    plate::Plate,
-    requirement::Requirement,
-};
+use workout_rs::{bar::Bar, bar_kind::BarKind, gym::Gym, plate::Plate, requirement::Requirement};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -51,12 +45,9 @@ fn main() -> anyhow::Result<()> {
         .requirements
         .iter()
         .fold(HashMap::new(), |mut acc, req| {
-            acc.entry(req.bar_kind)
-                .or_insert_with(Vec::new)
-                .push(*req);
+            acc.entry(req.bar_kind).or_insert_with(Vec::new).push(*req);
             acc
         });
-
 
     match args.requirements.is_empty() {
         true => {
@@ -64,7 +55,14 @@ fn main() -> anyhow::Result<()> {
 
             println!("Available weights:");
             for (bar, weights) in weights.iter().sorted() {
-                println!("{}: {:?}", bar, weights.iter().map(|w| *w as f64 / 1000.0).collect::<Vec<_>>());
+                println!(
+                    "{}: {:?}",
+                    bar,
+                    weights
+                        .iter()
+                        .map(|w| *w as f64 / 1000.0)
+                        .collect::<Vec<_>>()
+                );
             }
 
             Ok(())

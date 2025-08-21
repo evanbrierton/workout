@@ -38,7 +38,8 @@ impl Display for Bar {
 
 impl Ord for Bar {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.weight.cmp(&other.weight)
+        self.weight
+            .cmp(&other.weight)
             .then_with(|| self.gauge.cmp(&other.gauge))
             .then_with(|| self.kind.cmp(&other.kind))
     }

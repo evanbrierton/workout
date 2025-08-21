@@ -1,7 +1,4 @@
-use std::{
-    fmt::Display,
-    hash::Hash, rc::Rc,
-};
+use std::{fmt::Display, hash::Hash, rc::Rc};
 
 use itertools::Itertools;
 
@@ -15,8 +12,7 @@ pub struct Dumbbell {
 }
 
 impl Dumbbell {
-    pub fn new(plates: Vec<Plate>, bar: &Bar) -> Rc<Self> {
-        Rc::new(
+    pub fn new(plates: Vec<Plate>, bar: Bar) -> Self {
         Dumbbell {
             plates: plates
                 .into_iter()
@@ -24,8 +20,12 @@ impl Dumbbell {
                 .rev()
                 .filter(|p| p.gauge() == bar.gauge())
                 .collect(),
-            bar: *bar,
-        })
+            bar,
+        }
+    }
+
+    pub fn new_rc(plates: Vec<Plate>, bar: &Bar) -> Rc<Self> {
+        Rc::new(Dumbbell::new(plates, *bar))
     }
 
     pub fn plates(&self) -> &[Plate] {
@@ -39,7 +39,6 @@ impl Dumbbell {
     pub fn weight(&self) -> u32 {
         self.bar.weight() + self.plates.iter().map(|p| p.weight()).sum::<u32>() * 2
     }
-
 }
 
 impl Display for Dumbbell {
