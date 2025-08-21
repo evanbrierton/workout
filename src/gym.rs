@@ -14,16 +14,16 @@ use crate::{
 };
 
 pub struct Gym {
-    dumbbells: HashMap<Bar, HashSet<Dumbbell>>,
-    graphs: HashMap<Bar, UnGraph<Dumbbell, u32>>,
-    nodes: HashMap<Bar, HashMap<Dumbbell, NodeIndex>>,
-    zeroes: HashMap<Bar, Dumbbell>,
+    dumbbells: HashMap<Bar, HashSet<Rc<Dumbbell>>>,
+    graphs: HashMap<Bar, UnGraph<Rc<Dumbbell>, u32>>,
+    nodes: HashMap<Bar, HashMap<Rc<Dumbbell>, NodeIndex>>,
+    zeroes: HashMap<Bar, Rc<Dumbbell>>,
     bar_options: HashMap<BarKind, Vec<Bar>>,
 }
 
 impl Gym {
     pub fn new(plates: &HashMap<Plate, usize>, bars: &[Bar]) -> Self {
-        let dumbbells: HashMap<Bar, HashSet<Dumbbell>> = bars
+        let dumbbells: HashMap<Bar, HashSet<Rc<Dumbbell>>> = bars
             .iter()
             .map(|bar| (*bar, Self::dumbells(plates, bar)))
             .collect();
@@ -32,12 +32,12 @@ impl Gym {
         let mut nodes = HashMap::new();
 
         for (bar, dumbbells_set) in &dumbbells {
-            let (graph, node_map) = Self::tree(dumbbells_set);
+            let (graph, node_map) = Self::graph(dumbbells_set);
             graphs.insert(*bar, graph);
             nodes.insert(*bar, node_map);
         }
 
-        let zeroes: HashMap<Bar, Dumbbell> = bars
+        let zeroes = bars
             .iter()
             .map(|bar| (*bar, Dumbbell::new(vec![], bar)))
             .collect();
@@ -62,7 +62,7 @@ impl Gym {
     pub fn order(
         &self,
         requirements: &HashMap<BarKind, Vec<Requirement>>,
-    ) -> anyhow::Result<HashMap<Bar, Vec<Dumbbell>>> {
+    ) -> anyhow::Result<HashMap<Bar, Vec<Rc<Dumbbell>>>> {
         let mut bar_states = HashMap::new();
         let mut result = HashMap::new();
 
@@ -96,7 +96,7 @@ impl Gym {
                 result
                     .entry(*bar)
                     .or_insert_with(Vec::new)
-                    .push(dumbbell.clone());
+                    .push(dumbbell);
             }
         }
 
@@ -118,7 +118,7 @@ impl Gym {
             .collect()
     }
 
-    fn path(&self, start: &Dumbbell, bar: &Bar, target_weight: u32) -> Option<(u32, &Dumbbell)> {
+    fn path(&self, start: &Rc<Dumbbell>, bar: &Bar, target_weight: u32) -> Option<(u32, Rc<Dumbbell>)> {
         let graph = self.graphs.get(bar)?;
         let nodes = self.nodes.get(bar)?;
         let start_node = nodes.get(start)?;
@@ -133,10 +133,10 @@ impl Gym {
 
         let last_node_index = path.1.last()?;
         let last_node = graph.node_weight(*last_node_index)?;
-        Option::Some((path.0, last_node))
+        Option::Some((path.0, last_node.clone()))
     }
 
-    fn dumbells(weights_map: &HashMap<Plate, usize>, bar: &Bar) -> HashSet<Dumbbell> {
+    fn dumbells(weights_map: &HashMap<Plate, usize>, bar: &Bar) -> HashSet<Rc<Dumbbell>> {
         Self::available_dumbbells(
             &weights_map
                 .iter()
@@ -148,7 +148,7 @@ impl Gym {
         )
     }
 
-    fn available_dumbbells(plates: &[Plate], bar:&Bar) -> HashSet<Dumbbell> {
+    fn available_dumbbells(plates: &[Plate], bar:&Bar) -> HashSet<Rc<Dumbbell>> {
         plates
             .iter()
             .powerset()
@@ -157,10 +157,10 @@ impl Gym {
             .collect()
     }
 
-    fn tree(
-        dumbbells: &HashSet<Dumbbell>,
-    ) -> (UnGraph<Dumbbell, u32>, HashMap<Dumbbell, NodeIndex>) {
-        let mut graph = UnGraph::<Dumbbell, u32>::new_undirected();
+    fn graph(
+        dumbbells: &HashSet<Rc<Dumbbell>>,
+    ) -> (UnGraph<Rc<Dumbbell>, u32>, HashMap<Rc<Dumbbell>, NodeIndex>) {
+        let mut graph = UnGraph::<Rc<Dumbbell>, u32>::new_undirected();
         let mut nodes = HashMap::new();
 
         for dumbbell in dumbbells {

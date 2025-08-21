@@ -1,6 +1,6 @@
 use std::{
     fmt::Display,
-    hash::Hash,
+    hash::Hash, rc::Rc,
 };
 
 use itertools::Itertools;
@@ -15,7 +15,8 @@ pub struct Dumbbell {
 }
 
 impl Dumbbell {
-    pub fn new(plates: Vec<Plate>, bar: &Bar) -> Self {
+    pub fn new(plates: Vec<Plate>, bar: &Bar) -> Rc<Self> {
+        Rc::new(
         Dumbbell {
             plates: plates
                 .into_iter()
@@ -24,7 +25,7 @@ impl Dumbbell {
                 .filter(|p| p.gauge() == bar.gauge())
                 .collect(),
             bar: *bar,
-        }
+        })
     }
 
     pub fn plates(&self) -> &[Plate] {
