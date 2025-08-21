@@ -1,6 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet}
-};
+use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
 use petgraph::{
@@ -9,7 +7,11 @@ use petgraph::{
 };
 
 use crate::{
-    bar::Bar, bar_kind::BarKind, dumbbell::{Dumbbell, DumbbellId}, plate::Plate, requirement::Requirement,
+    bar::Bar,
+    bar_kind::BarKind,
+    dumbbell::{Dumbbell, DumbbellId},
+    plate::Plate,
+    requirement::Requirement,
 };
 
 pub struct Gym {
@@ -20,7 +22,8 @@ pub struct Gym {
 }
 
 impl Gym {
-    #[must_use] pub fn new(plates: &HashMap<Plate, usize>, bars: &[Bar]) -> Self {
+    #[must_use]
+    pub fn new(plates: &HashMap<Plate, usize>, bars: &[Bar]) -> Self {
         let dumbbells: HashMap<Bar, Vec<Dumbbell>> = bars
             .iter()
             .map(|bar| (*bar, Self::dumbells(plates, bar)))
@@ -84,9 +87,7 @@ impl Gym {
                         let start = bar_states.get(bar).unwrap_or(&DumbbellId(0));
                         (bar, self.path(*start, bar, req.weight))
                     })
-                    .filter_map(|(bar, path)| {
-                        path.map(|(weight, id)| (bar, (weight, id)))
-                    })
+                    .filter_map(|(bar, path)| path.map(|(weight, id)| (bar, (weight, id))))
                     .min_by_key(|(_, (weight, _))| *weight)
                     .map(|(bar, (_, id))| (bar, id))
                     .ok_or_else(|| {
@@ -98,15 +99,18 @@ impl Gym {
                     })?;
 
                 bar_states.insert(*bar, id);
-                result.entry(*bar).or_insert_with(Vec::new).push(&self.dumbbells[bar][id.0]);
+                result
+                    .entry(*bar)
+                    .or_insert_with(Vec::new)
+                    .push(&self.dumbbells[bar][id.0]);
             }
         }
 
         Result::Ok(result)
     }
 
-
-    #[must_use] pub fn weights(&self) -> HashMap<Bar, Vec<u32>> {
+    #[must_use]
+    pub fn weights(&self) -> HashMap<Bar, Vec<u32>> {
         self.dumbbells
             .iter()
             .map(|(bar, dumbbells)| {
@@ -121,12 +125,7 @@ impl Gym {
             .collect()
     }
 
-    fn path(
-        &self,
-        start: DumbbellId,
-        bar: &Bar,
-        target_weight: u32,
-    ) -> Option<(u32, DumbbellId)> {
+    fn path(&self, start: DumbbellId, bar: &Bar, target_weight: u32) -> Option<(u32, DumbbellId)> {
         let graph = self.graphs.get(bar)?;
         let nodes = self.nodes.get(bar)?;
         let start_node = nodes.get(&start)?;
@@ -153,7 +152,10 @@ impl Gym {
                 .flat_map(|(plate, count)| vec![plate; count])
                 .collect::<Vec<_>>(),
             bar,
-        ).into_iter().sorted().collect()
+        )
+        .into_iter()
+        .sorted()
+        .collect()
     }
 
     fn available_dumbbells(plates: &[Plate], bar: &Bar) -> HashSet<Dumbbell> {

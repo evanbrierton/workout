@@ -41,13 +41,13 @@ fn main() -> anyhow::Result<()> {
 
     let gym = Gym::new(&plates, &bars);
 
-    let grouped_requirements = args
-        .requirements
-        .iter()
-        .fold(HashMap::<_, Vec<_>>::new(), |mut acc, req| {
-            acc.entry(req.bar_kind).or_default().push(*req);
-            acc
-        });
+    let grouped_requirements =
+        args.requirements
+            .iter()
+            .fold(HashMap::<_, Vec<_>>::new(), |mut acc, req| {
+                acc.entry(req.bar_kind).or_default().push(*req);
+                acc
+            });
 
     match args.requirements.is_empty() {
         true => {

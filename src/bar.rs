@@ -9,7 +9,8 @@ pub struct Bar {
 }
 
 impl Bar {
-    #[must_use] pub fn new(weight: u32, gauge: u32, kind: BarKind) -> Self {
+    #[must_use]
+    pub fn new(weight: u32, gauge: u32, kind: BarKind) -> Self {
         Bar {
             weight,
             gauge,
@@ -17,15 +18,18 @@ impl Bar {
         }
     }
 
-    #[must_use] pub fn weight(&self) -> u32 {
+    #[must_use]
+    pub fn weight(&self) -> u32 {
         self.weight
     }
 
-    #[must_use] pub fn gauge(&self) -> u32 {
+    #[must_use]
+    pub fn gauge(&self) -> u32 {
         self.gauge
     }
 
-    #[must_use] pub fn kind(&self) -> &BarKind {
+    #[must_use]
+    pub fn kind(&self) -> &BarKind {
         &self.kind
     }
 }

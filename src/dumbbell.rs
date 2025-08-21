@@ -15,7 +15,8 @@ pub struct Dumbbell {
 }
 
 impl Dumbbell {
-    #[must_use] pub fn new(plates: Vec<Plate>, bar: Bar) -> Self {
+    #[must_use]
+    pub fn new(plates: Vec<Plate>, bar: Bar) -> Self {
         Dumbbell {
             plates: plates
                 .into_iter()
@@ -27,19 +28,23 @@ impl Dumbbell {
         }
     }
 
-    #[must_use] pub fn new_rc(plates: Vec<Plate>, bar: &Bar) -> Rc<Self> {
+    #[must_use]
+    pub fn new_rc(plates: Vec<Plate>, bar: &Bar) -> Rc<Self> {
         Rc::new(Dumbbell::new(plates, *bar))
     }
 
-    #[must_use] pub fn plates(&self) -> &[Plate] {
+    #[must_use]
+    pub fn plates(&self) -> &[Plate] {
         &self.plates
     }
 
-    #[must_use] pub fn bar(&self) -> &Bar {
+    #[must_use]
+    pub fn bar(&self) -> &Bar {
         &self.bar
     }
 
-    #[must_use] pub fn weight(&self) -> u32 {
+    #[must_use]
+    pub fn weight(&self) -> u32 {
         self.bar.weight() + self.plates.iter().map(Plate::weight).sum::<u32>() * 2
     }
 }
