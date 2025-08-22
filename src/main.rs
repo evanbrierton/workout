@@ -1,9 +1,11 @@
-use std::collections::HashMap;
+use std::hash::Hash;
+
+use hashbrown::HashMap;
 
 use anyhow::Ok;
 use clap::Parser;
 use itertools::Itertools;
-use workout_rs::{bar::Bar, bar_kind::BarKind, gym::Gym, plate::Plate, requirement::{self, Requirement}};
+use workout_rs::{bar::Bar, bar_kind::BarKind, gym::Gym, plate::Plate, requirement::Requirement};
 
 #[derive(Parser)]
 struct Args {
@@ -39,36 +41,49 @@ fn main() -> anyhow::Result<()> {
         Bar::new(15000, 2, BarKind::Barbell),
     ];
 
-    let gym = Gym::new(&plates, &bars);
+    let bars = bars
+        .into_iter()
+        .chunk_by(|bar| *bar.kind())
+        .into_iter()
+        .map(|(kind, bars)| (kind, bars.collect::<Vec<_>>()))
+        .collect::<HashMap<_, _>>();
 
-    match args.requirements.is_empty() {
-        true => {
-            let weights = gym.weights();
+    for (kind, bars) in bars {
+        let gym = Gym::new(&plates, &bars);
 
-            println!("Available weights:");
-            for (bar, weights) in weights.iter().sorted() {
-                println!(
-                    "{}: {:?}",
-                    bar,
-                    weights
-                        .iter()
-                        .map(|w| *w as f64 / 1000.0)
-                        .collect::<Vec<_>>()
-                );
-            }
+        match args.requirements.is_empty() {
+            true => {
+                let weights = gym.weights();
 
-            Ok(())
-        }
-        false => {
-            let ordered_dumbbells = gym.order(&args.requirements)?;
-            for (bar, dumbbells) in ordered_dumbbells {
-                println!("{bar}");
-                for dumbbell in dumbbells {
-                    println!("  - {dumbbell}");
+                println!("Available weights:");
+                for (bar, weights) in weights.iter().sorted() {
+                    println!(
+                        "{}: {:?}",
+                        bar,
+                        weights
+                            .iter()
+                            .map(|w| *w as f64 / 1000.0)
+                            .collect::<Vec<_>>()
+                    );
                 }
             }
+            false => {
+                let filtered_requirements = args
+                    .requirements
+                    .iter().copied()
+                    .filter(|req| req.bar_kind() == kind)
+                    .collect::<Vec<_>>();
 
-            Ok(())
+                let ordered_dumbbells = gym.order(&filtered_requirements)?;
+                for (bar, dumbbells) in ordered_dumbbells {
+                    println!("{bar}");
+                    for dumbbell in dumbbells {
+                        println!("  - {dumbbell}");
+                    }
+                }
+            }
         }
     }
+
+    Ok(())
 }

@@ -1,17 +1,29 @@
-use std::{ fmt::Display, str::FromStr};
+use std::{fmt::Display, str::FromStr};
 
 use crate::{bar_kind::BarKind, dumbbell::Dumbbell};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Requirement {
-    pub weight: u32,
-    pub bar_kind: BarKind,
+    weight: u32,
+    bar_kind: BarKind,
 }
 
 impl Requirement {
+    pub fn new(weight: u32, bar_kind: BarKind) -> Self {
+        Requirement { weight, bar_kind }
+    }
+
     #[must_use]
     pub fn matches(&self, dumbbell: &Dumbbell) -> bool {
         self.weight == dumbbell.weight() && self.bar_kind == *dumbbell.bar().kind()
+    }
+
+    pub fn bar_kind(&self) -> BarKind {
+        self.bar_kind
+    }
+
+    pub fn weight(&self) -> u32 {
+        self.weight
     }
 }
 

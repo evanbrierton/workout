@@ -48,6 +48,7 @@ impl Dumbbell {
         self.bar.weight() + self.plates.iter().map(Plate::weight).sum::<u32>() * 2
     }
 
+    #[must_use]
     pub fn adjacent(&self, other: &Self) -> bool {
         if self.bar != other.bar {
             return false;
@@ -57,10 +58,10 @@ impl Dumbbell {
             return false;
         }
 
-        return self.plates
-                .iter()
-                .zip(&other.plates)
-                .all(|(p1, p2)| p1.weight() == p2.weight());
+        self.plates
+            .iter()
+            .zip(&other.plates)
+            .all(|(p1, p2)| p1.weight() == p2.weight())
     }
 }
 
@@ -86,9 +87,7 @@ impl Display for Dumbbell {
 
         write!(
             f,
-            "{} ({}) {:?} ({}kg)",
-            self.bar.kind(),
-            self.bar.gauge(),
+            "{:?} ({}kg)",
             kg_plates,
             f64::from(self.weight()) / 1000.0,
         )

@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.99"
 clap = { version = "4.5.41", features = ["derive"] }
+hashbrown = "0.15.5"
 itertools = "0.14.0"
 multimap = "0.10.1"
 petgraph = "0.8.2"
