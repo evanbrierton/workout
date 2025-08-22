@@ -8,3 +8,4 @@ pub mod gym_error;
 pub mod gym_state;
 pub mod plate;
 pub mod requirement;
+pub mod graph;

@@ -47,8 +47,16 @@ fn main() -> anyhow::Result<()> {
         .sorted_by_key(|(kind, _)| *kind)
         .collect::<Vec<_>>();
 
-    for (kind, bars) in bars {
-        process_bars(kind, &plates, &bars, &args.requirements)?;
+    match bars.is_empty() {
+        true => {
+            println!("No bars available.");
+        }
+        false => {
+            for (kind, bars) in bars {
+                process_bars(kind, &plates, &bars, &args.requirements)?;
+            }
+
+        }
     }
 
     Ok(())
