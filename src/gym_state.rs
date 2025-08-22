@@ -4,7 +4,7 @@ use hashbrown::HashMap;
 
 use crate::{bar::Bar, dumbbell::Dumbbell};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GymStateId(pub usize);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -24,11 +24,19 @@ impl GymState {
 
         for (bar, dumbbell) in &self.state {
             if let Some(other_dumbbell) = other.get(bar) {
-                if dumbbell.adjacent(other_dumbbell) {
+                let same = dumbbell == other_dumbbell;
+                let adjacent = dumbbell.adjacent(other_dumbbell);
+
+                if !(same || adjacent) {
+                    return false;
+                }
+
+                if adjacent {
                     adjacencies += 1;
-                    if adjacencies > 1 {
-                        return false;
-                    }
+                }
+
+                if adjacencies > 1 {
+                    return false;
                 }
             }
         }

@@ -4,9 +4,7 @@ use hashbrown::HashMap;
 use itertools::Itertools;
 use petgraph::{
     algo,
-    dot::{Config, Dot},
-    graph::{DiGraph, NodeIndex, UnGraph},
-    visit::{IntoNodeReferences, NodeRef},
+    graph::{NodeIndex, UnGraph},
 };
 
 use crate::{
@@ -19,12 +17,9 @@ use crate::{
     requirement::Requirement,
 };
 
-static ADD_WEIGHT: u32 = 1;
-static REMOVE_WEIGHT: u32 = 1;
-
 pub struct Gym {
     states: Vec<GymState>,
-    graph: DiGraph<GymStateId, u32>,
+    graph: UnGraph<GymStateId, u32>,
     nodes: HashMap<GymStateId, NodeIndex>,
     weights: HashMap<Bar, Vec<u32>>,
     bar_options: HashMap<BarKind, Vec<Bar>>,
@@ -51,24 +46,19 @@ impl Gym {
             })
             .collect();
 
-        let states = dumbbells
-            .values()
+        let states: Vec<_> = dumbbells
+            .into_iter()
+            .map(|(_, d)| d)
             .multi_cartesian_product()
             .map(|dumbbells| {
                 GymState::new(
                     dumbbells
                         .into_iter()
-                        .map(|dumbbell| (*dumbbell.bar(), dumbbell.clone()))
+                        .map(|dumbbell| (*dumbbell.bar(), dumbbell))
                         .collect::<HashMap<_, _>>(),
                 )
             })
-            .collect::<Vec<_>>();
-
-        // print all states
-        for (i, state) in states.iter().enumerate() {
-            println!("State {i}:");
-            println!("{state}");
-        }
+            .collect();
 
         let ids = states
             .iter()
@@ -77,21 +67,6 @@ impl Gym {
             .collect::<HashSet<_>>();
 
         let (graph, nodes) = Self::graph(&states, &ids);
-
-        let binding =
-            |_: &DiGraph<GymStateId, u32>,
-             node: <&DiGraph<GymStateId, u32> as IntoNodeReferences>::NodeRef| {
-                format!("label = \"{}\"", states[node.1.0])
-            };
-
-        let dot = Dot::with_attr_getters(
-            &graph,
-            &[Config::EdgeNoLabel, Config::NodeNoLabel],
-            &|_, _| String::new(),
-            &binding,
-        );
-
-        // println!("Graph:\n{dot:?}");
 
         let bar_options: HashMap<BarKind, Vec<Bar>> =
             bars.iter().fold(HashMap::new(), |mut acc, bar| {
@@ -115,49 +90,13 @@ impl Gym {
     pub fn order(
         &self,
         requirements: &[Requirement],
-    ) -> anyhow::Result<HashMap<Bar, Vec<&Dumbbell>>, GymError> {
+    ) -> Result<HashMap<Bar, Vec<&Dumbbell>>, GymError> {
         if requirements.is_empty() {
             return Ok(HashMap::new());
         }
 
-        // Find all states that satisfy each requirement
-        let requirement_states: Vec<Vec<GymStateId>> = requirements
-            .iter()
-            .map(|req| self.find_states_for_requirement(*req))
-            .collect::<Result<Vec<_>, _>>()?;
+        let optimal_sequence = self.find_optimal_sequence(requirements)?;
 
-        println!("Requirement states: {requirement_states:?}");
-
-        // Compute shortest distances between all state pairs
-        let shortest_distances: HashMap<(NodeIndex, NodeIndex), u32> =
-            algo::johnson(&self.graph, |e| *e.weight())
-                .map_err(|_| GymError::InvalidRequirement(requirements[0]))?;
-
-        // Find optimal path through requirement states using dynamic programming
-        let start_states = requirement_states
-            .first()
-            .ok_or(GymError::InvalidRequirement(requirements[0]))?;
-
-        // let seqs = start_states
-        //     .iter()
-        //     .map(|start_state| {
-        //         self.find_optimal_sequence(*start_state,  &requirement_states, &shortest_distances)
-        //     })
-        //     .collect::<Vec<_>>();
-
-        // println!("Shortest paths from start states: {seqs:?}");
-
-        let optimal_sequence = start_states
-            .iter()
-            .map(|start_state| {
-                self.find_optimal_sequence(*start_state, &requirement_states, &shortest_distances)
-            })
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .min_by_key(|seq| self.find_shortest_path_between_states(seq[0], seq[1]).len())
-            .ok_or(GymError::InvalidRequirement(requirements[0]))?;
-
-        // Convert the complete path to the expected result format
         let mut result = HashMap::<Bar, Vec<&Dumbbell>>::new();
         let mut requirement_index = 0;
 
@@ -178,7 +117,6 @@ impl Gym {
                 }
             }
 
-            // Move to the next requirement if we have satisfied the current one
             if requirement_index < requirements.len() - 1 {
                 requirement_index += 1;
             }
@@ -218,8 +156,8 @@ impl Gym {
     fn graph(
         states: &[GymState],
         ids: &HashSet<GymStateId>,
-    ) -> (DiGraph<GymStateId, u32>, HashMap<GymStateId, NodeIndex>) {
-        let mut graph = DiGraph::<GymStateId, u32>::new();
+    ) -> (UnGraph<GymStateId, u32>, HashMap<GymStateId, NodeIndex>) {
+        let mut graph = UnGraph::<GymStateId, u32>::new_undirected();
         let mut nodes = HashMap::new();
 
         for id in ids {
@@ -232,32 +170,19 @@ impl Gym {
                 let n1 = nodes[&GymStateId(i1)];
                 let n2 = nodes[&GymStateId(i2)];
 
-                let (longer, shorter) = if state1.plates() > state2.plates() {
-                    (n1, n2)
-                } else {
-                    (n2, n1)
-                };
-
-                graph.add_edge(longer, shorter, REMOVE_WEIGHT);
-                graph.add_edge(shorter, longer, ADD_WEIGHT);
+                graph.add_edge(n1, n2, 1);
             }
         }
 
         (graph, nodes)
     }
 
-    /// Find all gym states that satisfy a given requirement
-    /// Returns states sorted by a consistent criteria to ensure deterministic behavior
-    fn find_states_for_requirement(
-        &self,
-        requirement: Requirement,
-    ) -> Result<Vec<GymStateId>, GymError> {
+    fn find_states_for_requirement(&self, requirement: Requirement) -> Vec<GymStateId> {
         let matching_states: Vec<(GymStateId, usize)> = self
             .states
             .iter()
             .enumerate()
             .filter_map(|(i, state)| {
-                // Check if any bar of the required kind has a dumbbell with the required weight
                 let bars = self.bar_options.get(&requirement.bar_kind())?;
 
                 for bar in bars {
@@ -271,63 +196,56 @@ impl Gym {
             })
             .collect();
 
-        if matching_states.is_empty() {
-            Err(GymError::InvalidRequirement(requirement))
-        } else {
-            let f = |(_, complexity): &(GymStateId, usize)| *complexity;
-            Ok(matching_states
-                .into_iter()
-                .sorted_by_key(f)
-                .map(|(id, _)| id)
-                .collect())
-        }
+        matching_states
+            .into_iter()
+            .sorted_by_key(|(_, complexity): &(GymStateId, usize)| *complexity)
+            .map(|(id, _)| id)
+            .collect()
     }
 
-    /// Find optimal sequence through requirement states using dynamic programming
     fn find_optimal_sequence(
         &self,
-        start_state: GymStateId,
-        requirement_states: &[Vec<GymStateId>],
-        distances: &HashMap<(NodeIndex, NodeIndex), u32>,
+        requirements: &[Requirement],
     ) -> Result<Vec<GymStateId>, GymError> {
+        let requirement_states: Vec<Vec<GymStateId>> = requirements
+            .iter()
+            .map(|req| self.find_states_for_requirement(*req))
+            .collect();
+
         let n = requirement_states.len();
-        if n == 0 {
-            return Ok(vec![]);
-        }
-        if n == 1 {
-            return Ok(vec![requirement_states[0][0]]);
+
+        match n {
+            0 => return Ok(vec![]),
+            1 => return requirement_states[0].iter().min_by_key(|id| self.states[id.0].clone()).ok_or(GymError::InvalidRequirement(requirements[0])).map(|id| vec![*id]),
+            _ => {}
         }
 
-        let start_node = self.nodes[&start_state];
+        let distances: HashMap<(NodeIndex, NodeIndex), u32> =
+            algo::johnson(&self.graph, |e| *e.weight())
+                .map_err(|_| GymError::InvalidRequirement(requirements[0]))?;
 
-        // Dynamic programming: dp[i][state] = minimum cost to reach requirement i ending at state
         let mut dp: Vec<HashMap<GymStateId, (u32, Option<GymStateId>)>> = vec![HashMap::new(); n];
 
-        // Initialize first requirement
         for &state in &requirement_states[0] {
-            let state_node = self.nodes[&state];
-            if let Some(&cost) = distances.get(&(start_node, state_node)) {
-                dp[0].insert(state, (cost, None));
-            }
+            dp[0].insert(state, (0, None));
         }
 
-        // Fill DP table
         for i in 1..n {
             for &current_state in &requirement_states[i] {
                 let current_node = self.nodes[&current_state];
                 let mut min_cost = u32::MAX;
                 let mut best_prev = None;
 
-                // Try all states from previous requirement
-                for (&prev_state, &(prev_cost, _)) in &dp[i - 1] {
+                let mut prev_states: Vec<_> = dp[i - 1]
+                    .iter()
+                    .map(|(&state, &(cost, _))| (state, cost))
+                    .collect();
+                prev_states.sort_by_key(|&(state, _)| state);
+
+                for (prev_state, prev_cost) in prev_states {
                     let prev_node = self.nodes[&prev_state];
                     if let Some(&transition_cost) = distances.get(&(prev_node, current_node)) {
                         let total_cost = prev_cost.saturating_add(transition_cost);
-
-                        println!(
-                            "Transition from {:?} to {:?}: cost = {} + {} = {}",
-                            prev_state, current_state, prev_cost, transition_cost, total_cost
-                        );
 
                         if total_cost < min_cost {
                             min_cost = total_cost;
@@ -342,24 +260,11 @@ impl Gym {
             }
         }
 
-        // let x = dp
-        // .iter()
-        // .sorted_by_key(|(id, _)| self.states[id.0].plates())
-        // .collect::<Vec<_>>();
-
-        println!("Final DP state: {:?}", dp);
-
-        // Find optimal final state
         let (&final_state, _) = dp[n - 1]
             .iter()
-            .sorted_by_key(|(id, _)| self.states[id.0].plates())
             .min_by_key(|(_, (cost, _))| *cost)
-            .ok_or(GymError::InvalidRequirement(Requirement::new(
-                0,
-                BarKind::Dumbbell,
-            )))?;
+            .ok_or(GymError::InvalidRequirement(requirements[n - 1]))?;
 
-        // Reconstruct path
         let mut path = Vec::new();
         let mut current = final_state;
         path.push(current);
@@ -373,45 +278,5 @@ impl Gym {
 
         path.reverse();
         Ok(path)
-    }
-
-    /// Find the actual shortest path between two specific states
-    fn find_shortest_path_between_states(
-        &self,
-        start: GymStateId,
-        end: GymStateId,
-    ) -> Vec<GymStateId> {
-        if start == end {
-            return vec![];
-        }
-
-        let start_node = self.nodes[&start];
-        let end_node = self.nodes[&end];
-
-        // Use A* to find the actual path (not just the distance)
-        if let Some((_, path)) = algo::astar(
-            &self.graph,
-            start_node,
-            |n| n == end_node,
-            |e| *e.weight(),
-            |_| 0, // No heuristic needed since all edges have weight 1
-        ) {
-            // Convert node path back to state IDs
-            let state_path: Vec<GymStateId> = path
-                .into_iter()
-                .filter_map(|node| {
-                    // Find the state ID for this node
-                    self.nodes
-                        .iter()
-                        .find(|(_, n)| **n == node)
-                        .map(|(&state_id, _)| state_id)
-                })
-                .collect();
-
-            state_path
-        } else {
-            // Fallback: if no path found, just return the start and end states
-            vec![start, end]
-        }
     }
 }
