@@ -47,6 +47,21 @@ impl Dumbbell {
     pub fn weight(&self) -> u32 {
         self.bar.weight() + self.plates.iter().map(Plate::weight).sum::<u32>() * 2
     }
+
+    pub fn adjacent(&self, other: &Self) -> bool {
+        if self.bar != other.bar {
+            return false;
+        }
+
+        if self.plates.len().abs_diff(other.plates.len()) != 1 {
+            return false;
+        }
+
+        return self.plates
+                .iter()
+                .zip(&other.plates)
+                .all(|(p1, p2)| p1.weight() == p2.weight());
+    }
 }
 
 impl PartialOrd for Dumbbell {

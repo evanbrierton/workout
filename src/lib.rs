@@ -7,3 +7,5 @@ pub mod gym;
 pub mod plate;
 pub mod requirement;
 pub mod gym_error;
+pub mod gym_state;
+pub mod tsp;

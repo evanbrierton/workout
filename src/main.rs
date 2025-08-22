@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use anyhow::Ok;
 use clap::Parser;
 use itertools::Itertools;
-use workout_rs::{bar::Bar, bar_kind::BarKind, gym::Gym, plate::Plate, requirement::Requirement};
+use workout_rs::{bar::Bar, bar_kind::BarKind, gym::Gym, plate::Plate, requirement::{self, Requirement}};
 
 #[derive(Parser)]
 struct Args {
@@ -41,14 +41,6 @@ fn main() -> anyhow::Result<()> {
 
     let gym = Gym::new(&plates, &bars);
 
-    let grouped_requirements =
-        args.requirements
-            .iter()
-            .fold(HashMap::<_, Vec<_>>::new(), |mut acc, req| {
-                acc.entry(req.bar_kind).or_default().push(*req);
-                acc
-            });
-
     match args.requirements.is_empty() {
         true => {
             let weights = gym.weights();
@@ -68,7 +60,7 @@ fn main() -> anyhow::Result<()> {
             Ok(())
         }
         false => {
-            let ordered_dumbbells = gym.order(&grouped_requirements)?;
+            let ordered_dumbbells = gym.order(&args.requirements)?;
             for (bar, dumbbells) in ordered_dumbbells {
                 println!("{bar}");
                 for dumbbell in dumbbells {
