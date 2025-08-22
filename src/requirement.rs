@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{ fmt::Display, str::FromStr};
 
 use crate::{bar_kind::BarKind, dumbbell::Dumbbell};
 
@@ -29,6 +29,12 @@ impl FromStr for Requirement {
             weight: kgs_to_grams(weight),
             bar_kind,
         })
+    }
+}
+
+impl Display for Requirement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}kg {}", f64::from(self.weight) / 1000.0, self.bar_kind)
     }
 }
 

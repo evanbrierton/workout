@@ -6,3 +6,4 @@ pub mod dumbbell;
 pub mod gym;
 pub mod plate;
 pub mod requirement;
+pub mod gym_error;

@@ -9,3 +9,4 @@ clap = { version = "4.5.41", features = ["derive"] }
 itertools = "0.14.0"
 petgraph = "0.8.2"
 regex = "1.11.1"
+thiserror = "2.0.16"
