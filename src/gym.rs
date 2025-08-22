@@ -272,7 +272,7 @@ impl Gym {
         let (&final_state, _) = dp[n - 1]
             .iter()
             .min_by_key(|(_, (cost, _))| *cost)
-            .ok_or({ GymError::InvalidRequirement(Requirement::new(0, BarKind::Dumbbell)) })?;
+            .ok_or(GymError::InvalidRequirement(Requirement::new(0, BarKind::Dumbbell)))?;
 
         // Reconstruct path
         let mut path = Vec::new();
