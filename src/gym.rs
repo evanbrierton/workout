@@ -106,42 +106,39 @@ impl Gym {
                 .map_err(|_| GymError::InvalidRequirement(requirements[0]))?;
 
         // Find optimal path through requirement states using dynamic programming
-        let optimal_sequence =
-            self.find_optimal_sequence(&requirement_states, &shortest_distances)?;
+        let start_states = requirement_states
+            .first()
+            .ok_or(GymError::InvalidRequirement(requirements[0]))?;
 
-        // Get the complete path with all intermediate transitions
-        let complete_path = self.get_complete_transition_path(&optimal_sequence, &shortest_distances);
+        let optimal_sequence = start_states.iter()
+            .map(|start_state| {
+                self.find_optimal_sequence(*start_state, &requirement_states, &shortest_distances)
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .min_by_key(Vec::len)
+            .ok_or(GymError::InvalidRequirement(requirements[0]))?;
 
         // Convert the complete path to the expected result format
-        let mut result = HashMap::new();
+        let mut result = HashMap::<Bar, Vec<&Dumbbell>>::new();
         let mut requirement_index = 0;
 
-        for (path_index, &state_id) in complete_path.iter().enumerate() {
+        for state_id in optimal_sequence {
             let state = &self.states[state_id.0];
+            let bars = self.bar_options.get(&requirements[requirement_index].bar_kind())
+                .ok_or(GymError::InvalidRequirement(requirements[requirement_index]))?;
 
-            if path_index == 0 {
-                // Starting position - add empty dumbbells
-                for (bar, dumbbell) in state.value() {
-                    if dumbbell.plates().is_empty() {
-                        result.entry(*bar).or_insert_with(Vec::new).push(dumbbell);
+            for bar in bars {
+                if let Some(dumbbell) = state.get(bar) {
+                    if dumbbell.weight() == requirements[requirement_index].weight() {
+                        result.entry(*bar).or_default().push(dumbbell);
                     }
                 }
-            } else {
-                // Check if this state satisfies the next requirement
-                if requirement_index < requirements.len() {
-                    let requirement = requirements[requirement_index];
-                    let bars = &self.bar_options[&requirement.bar_kind()];
+            }
 
-                    for bar in bars {
-                        if let Some(dumbbell) = state.get(bar) {
-                            if dumbbell.weight() == requirement.weight() {
-                                result.entry(*bar).or_insert_with(Vec::new).push(dumbbell);
-                                requirement_index += 1;
-                                break;
-                            }
-                        }
-                    }
-                }
+            // Move to the next requirement if we have satisfied the current one
+            if requirement_index < requirements.len() - 1 {
+                requirement_index += 1;
             }
         }
 
@@ -232,11 +229,6 @@ impl Gym {
         if matching_states.is_empty() {
             Err(GymError::InvalidRequirement(requirement))
         } else {
-            // Sort by complexity (fewer plates first) then by state ID for determinism
-            matching_states.sort_by(|(id1, plates1), (id2, plates2)| {
-                plates1.cmp(plates2).then_with(|| id1.0.cmp(&id2.0))
-            });
-
             Ok(matching_states.into_iter().map(|(id, _)| id).collect())
         }
     }
@@ -244,6 +236,7 @@ impl Gym {
     /// Find optimal sequence through requirement states using dynamic programming
     fn find_optimal_sequence(
         &self,
+        start_state: GymStateId,
         requirement_states: &[Vec<GymStateId>],
         distances: &HashMap<(NodeIndex, NodeIndex), u32>,
     ) -> Result<Vec<GymStateId>, GymError> {
@@ -255,8 +248,6 @@ impl Gym {
             return Ok(vec![requirement_states[0][0]]);
         }
 
-        // Start from the initial state (empty dumbbells)
-        let start_state = GymStateId(0); // Assuming first state is the empty state
         let start_node = self.nodes[&start_state];
 
         // Dynamic programming: dp[i][state] = minimum cost to reach requirement i ending at state
@@ -316,47 +307,14 @@ impl Gym {
         Ok(path)
     }
 
-    /// Get the complete path including all intermediate transitions
-    /// This ensures we don't skip any necessary plate changes
-    fn get_complete_transition_path(
-        &self,
-        optimal_sequence: &[GymStateId],
-        distances: &HashMap<(NodeIndex, NodeIndex), u32>,
-    ) -> std::vec::Vec<GymStateId> {
-        if optimal_sequence.is_empty() {
-            return vec![GymStateId(0)]; // Just return the starting state
-        }
-
-        let mut complete_path = vec![GymStateId(0)]; // Start with empty state
-
-        for &target_state in optimal_sequence {
-            let current_state = *complete_path.last().unwrap();
-
-            if current_state != target_state {
-                // Find the actual shortest path between current and target states
-                let intermediate_path = self.find_shortest_path_between_states(
-                    current_state,
-                    target_state,
-                    distances
-                );
-
-                // Add intermediate states (skip the first one as it's already in complete_path)
-                complete_path.extend(intermediate_path.into_iter().skip(1));
-            }
-        }
-
-        complete_path
-    }
-
     /// Find the actual shortest path between two specific states
     fn find_shortest_path_between_states(
         &self,
         start: GymStateId,
-        end: GymStateId,
-        distances: &HashMap<(NodeIndex, NodeIndex), u32>,
+        end: GymStateId
     ) -> std::vec::Vec<GymStateId> {
         if start == end {
-            return vec![start];
+            return vec![];
         }
 
         let start_node = self.nodes[&start];
