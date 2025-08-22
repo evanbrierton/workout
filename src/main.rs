@@ -1,5 +1,3 @@
-use std::hash::Hash;
-
 use hashbrown::HashMap;
 
 use anyhow::Ok;
@@ -70,7 +68,8 @@ fn main() -> anyhow::Result<()> {
             false => {
                 let filtered_requirements = args
                     .requirements
-                    .iter().copied()
+                    .iter()
+                    .copied()
                     .filter(|req| req.bar_kind() == kind)
                     .collect::<Vec<_>>();
 

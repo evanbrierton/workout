@@ -110,11 +110,21 @@ impl Gym {
             self.find_optimal_sequence(&requirement_states, &shortest_distances)?;
 
         // Convert the optimal sequence to the expected result format
+        // Only include dumbbells that are actually used for the requirements
         let mut result = HashMap::new();
-        for &state_id in &optimal_sequence {
+        for (req_index, &state_id) in optimal_sequence.iter().enumerate() {
             let state = &self.states[state_id.0];
-            for (bar, dumbbell) in state.value() {
-                result.entry(*bar).or_insert_with(Vec::new).push(dumbbell);
+            let requirement = requirements[req_index];
+
+            // Find the specific dumbbell that satisfies this requirement
+            let bars = &self.bar_options[&requirement.bar_kind()];
+            for bar in bars {
+                if let Some(dumbbell) = state.get(bar) {
+                    if dumbbell.weight() == requirement.weight() {
+                        result.entry(*bar).or_insert_with(Vec::new).push(dumbbell);
+                        break; // Only add one dumbbell per requirement
+                    }
+                }
             }
         }
 
@@ -259,9 +269,10 @@ impl Gym {
             }
         }
         // Find optimal final state
-        let (&final_state, _) = dp[n - 1].iter().min_by_key(|(_, (cost, _))| *cost).ok_or({
-            GymError::InvalidRequirement(Requirement::new(0, BarKind::Dumbbell))
-        })?;
+        let (&final_state, _) = dp[n - 1]
+            .iter()
+            .min_by_key(|(_, (cost, _))| *cost)
+            .ok_or({ GymError::InvalidRequirement(Requirement::new(0, BarKind::Dumbbell)) })?;
 
         // Reconstruct path
         let mut path = Vec::new();

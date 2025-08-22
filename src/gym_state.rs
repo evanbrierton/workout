@@ -1,5 +1,4 @@
 use hashbrown::HashMap;
-use petgraph::adj;
 
 use crate::{bar::Bar, dumbbell::Dumbbell};
 

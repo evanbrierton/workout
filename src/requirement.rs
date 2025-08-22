@@ -9,6 +9,7 @@ pub struct Requirement {
 }
 
 impl Requirement {
+    #[must_use]
     pub fn new(weight: u32, bar_kind: BarKind) -> Self {
         Requirement { weight, bar_kind }
     }
@@ -18,10 +19,12 @@ impl Requirement {
         self.weight == dumbbell.weight() && self.bar_kind == *dumbbell.bar().kind()
     }
 
+    #[must_use]
     pub fn bar_kind(&self) -> BarKind {
         self.bar_kind
     }
 
+    #[must_use]
     pub fn weight(&self) -> u32 {
         self.weight
     }
