@@ -4,7 +4,9 @@ use hashbrown::HashMap;
 use itertools::Itertools;
 use petgraph::{
     algo,
-    graph::{NodeIndex, UnGraph},
+    dot::{Config, Dot},
+    graph::{DiGraph, NodeIndex, UnGraph},
+    visit::{IntoNodeReferences, NodeRef},
 };
 
 use crate::{
@@ -17,9 +19,12 @@ use crate::{
     requirement::Requirement,
 };
 
+static ADD_WEIGHT: u32 = 1;
+static REMOVE_WEIGHT: u32 = 1;
+
 pub struct Gym {
     states: Vec<GymState>,
-    graph: UnGraph<GymStateId, u32>,
+    graph: DiGraph<GymStateId, u32>,
     nodes: HashMap<GymStateId, NodeIndex>,
     weights: HashMap<Bar, Vec<u32>>,
     bar_options: HashMap<BarKind, Vec<Bar>>,
@@ -59,6 +64,12 @@ impl Gym {
             })
             .collect::<Vec<_>>();
 
+        // print all states
+        for (i, state) in states.iter().enumerate() {
+            println!("State {i}:");
+            println!("{state}");
+        }
+
         let ids = states
             .iter()
             .enumerate()
@@ -66,6 +77,21 @@ impl Gym {
             .collect::<HashSet<_>>();
 
         let (graph, nodes) = Self::graph(&states, &ids);
+
+        let binding =
+            |_: &DiGraph<GymStateId, u32>,
+             node: <&DiGraph<GymStateId, u32> as IntoNodeReferences>::NodeRef| {
+                format!("label = \"{}\"", states[node.1.0])
+            };
+
+        let dot = Dot::with_attr_getters(
+            &graph,
+            &[Config::EdgeNoLabel, Config::NodeNoLabel],
+            &|_, _| String::new(),
+            &binding,
+        );
+
+        // println!("Graph:\n{dot:?}");
 
         let bar_options: HashMap<BarKind, Vec<Bar>> =
             bars.iter().fold(HashMap::new(), |mut acc, bar| {
@@ -100,6 +126,8 @@ impl Gym {
             .map(|req| self.find_states_for_requirement(*req))
             .collect::<Result<Vec<_>, _>>()?;
 
+        println!("Requirement states: {requirement_states:?}");
+
         // Compute shortest distances between all state pairs
         let shortest_distances: HashMap<(NodeIndex, NodeIndex), u32> =
             algo::johnson(&self.graph, |e| *e.weight())
@@ -110,13 +138,23 @@ impl Gym {
             .first()
             .ok_or(GymError::InvalidRequirement(requirements[0]))?;
 
-        let optimal_sequence = start_states.iter()
+        // let seqs = start_states
+        //     .iter()
+        //     .map(|start_state| {
+        //         self.find_optimal_sequence(*start_state,  &requirement_states, &shortest_distances)
+        //     })
+        //     .collect::<Vec<_>>();
+
+        // println!("Shortest paths from start states: {seqs:?}");
+
+        let optimal_sequence = start_states
+            .iter()
             .map(|start_state| {
                 self.find_optimal_sequence(*start_state, &requirement_states, &shortest_distances)
             })
             .collect::<Result<Vec<_>, _>>()?
             .into_iter()
-            .min_by_key(Vec::len)
+            .min_by_key(|seq| self.find_shortest_path_between_states(seq[0], seq[1]).len())
             .ok_or(GymError::InvalidRequirement(requirements[0]))?;
 
         // Convert the complete path to the expected result format
@@ -125,8 +163,12 @@ impl Gym {
 
         for state_id in optimal_sequence {
             let state = &self.states[state_id.0];
-            let bars = self.bar_options.get(&requirements[requirement_index].bar_kind())
-                .ok_or(GymError::InvalidRequirement(requirements[requirement_index]))?;
+            let bars = self
+                .bar_options
+                .get(&requirements[requirement_index].bar_kind())
+                .ok_or(GymError::InvalidRequirement(
+                    requirements[requirement_index],
+                ))?;
 
             for bar in bars {
                 if let Some(dumbbell) = state.get(bar) {
@@ -176,8 +218,8 @@ impl Gym {
     fn graph(
         states: &[GymState],
         ids: &HashSet<GymStateId>,
-    ) -> (UnGraph<GymStateId, u32>, HashMap<GymStateId, NodeIndex>) {
-        let mut graph = UnGraph::<GymStateId, u32>::new_undirected();
+    ) -> (DiGraph<GymStateId, u32>, HashMap<GymStateId, NodeIndex>) {
+        let mut graph = DiGraph::<GymStateId, u32>::new();
         let mut nodes = HashMap::new();
 
         for id in ids {
@@ -189,7 +231,15 @@ impl Gym {
             if state1.adjacent(state2) {
                 let n1 = nodes[&GymStateId(i1)];
                 let n2 = nodes[&GymStateId(i2)];
-                graph.add_edge(n1, n2, 1);
+
+                let (longer, shorter) = if state1.plates() > state2.plates() {
+                    (n1, n2)
+                } else {
+                    (n2, n1)
+                };
+
+                graph.add_edge(longer, shorter, REMOVE_WEIGHT);
+                graph.add_edge(shorter, longer, ADD_WEIGHT);
             }
         }
 
@@ -202,7 +252,7 @@ impl Gym {
         &self,
         requirement: Requirement,
     ) -> Result<Vec<GymStateId>, GymError> {
-        let mut matching_states: Vec<(GymStateId, u32)> = self
+        let matching_states: Vec<(GymStateId, usize)> = self
             .states
             .iter()
             .enumerate()
@@ -213,12 +263,7 @@ impl Gym {
                 for bar in bars {
                     if let Some(dumbbell) = state.get(bar) {
                         if dumbbell.weight() == requirement.weight() {
-                            // Calculate a "complexity score" for consistent ordering
-                            // States with fewer total plates are preferred (simpler states)
-                            let total_plates: u32 = state.value().values()
-                                .map(|d| d.plates().len() as u32)
-                                .sum();
-                            return Some((GymStateId(i), total_plates));
+                            return Some((GymStateId(i), dumbbell.plates().len()));
                         }
                     }
                 }
@@ -229,7 +274,12 @@ impl Gym {
         if matching_states.is_empty() {
             Err(GymError::InvalidRequirement(requirement))
         } else {
-            Ok(matching_states.into_iter().map(|(id, _)| id).collect())
+            let f = |(_, complexity): &(GymStateId, usize)| *complexity;
+            Ok(matching_states
+                .into_iter()
+                .sorted_by_key(f)
+                .map(|(id, _)| id)
+                .collect())
         }
     }
 
@@ -273,6 +323,12 @@ impl Gym {
                     let prev_node = self.nodes[&prev_state];
                     if let Some(&transition_cost) = distances.get(&(prev_node, current_node)) {
                         let total_cost = prev_cost.saturating_add(transition_cost);
+
+                        println!(
+                            "Transition from {:?} to {:?}: cost = {} + {} = {}",
+                            prev_state, current_state, prev_cost, transition_cost, total_cost
+                        );
+
                         if total_cost < min_cost {
                             min_cost = total_cost;
                             best_prev = Some(prev_state);
@@ -285,11 +341,23 @@ impl Gym {
                 }
             }
         }
+
+        // let x = dp
+        // .iter()
+        // .sorted_by_key(|(id, _)| self.states[id.0].plates())
+        // .collect::<Vec<_>>();
+
+        println!("Final DP state: {:?}", dp);
+
         // Find optimal final state
         let (&final_state, _) = dp[n - 1]
             .iter()
+            .sorted_by_key(|(id, _)| self.states[id.0].plates())
             .min_by_key(|(_, (cost, _))| *cost)
-            .ok_or(GymError::InvalidRequirement(Requirement::new(0, BarKind::Dumbbell)))?;
+            .ok_or(GymError::InvalidRequirement(Requirement::new(
+                0,
+                BarKind::Dumbbell,
+            )))?;
 
         // Reconstruct path
         let mut path = Vec::new();
@@ -311,8 +379,8 @@ impl Gym {
     fn find_shortest_path_between_states(
         &self,
         start: GymStateId,
-        end: GymStateId
-    ) -> std::vec::Vec<GymStateId> {
+        end: GymStateId,
+    ) -> Vec<GymStateId> {
         if start == end {
             return vec![];
         }
@@ -333,7 +401,8 @@ impl Gym {
                 .into_iter()
                 .filter_map(|node| {
                     // Find the state ID for this node
-                    self.nodes.iter()
+                    self.nodes
+                        .iter()
                         .find(|(_, n)| **n == node)
                         .map(|(&state_id, _)| state_id)
                 })
