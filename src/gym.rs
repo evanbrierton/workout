@@ -109,20 +109,37 @@ impl Gym {
         let optimal_sequence =
             self.find_optimal_sequence(&requirement_states, &shortest_distances)?;
 
-        // Convert the optimal sequence to the expected result format
-        // Only include dumbbells that are actually used for the requirements
-        let mut result = HashMap::new();
-        for (req_index, &state_id) in optimal_sequence.iter().enumerate() {
-            let state = &self.states[state_id.0];
-            let requirement = requirements[req_index];
+        // Get the complete path with all intermediate transitions
+        let complete_path = self.get_complete_transition_path(&optimal_sequence, &shortest_distances);
 
-            // Find the specific dumbbell that satisfies this requirement
-            let bars = &self.bar_options[&requirement.bar_kind()];
-            for bar in bars {
-                if let Some(dumbbell) = state.get(bar) {
-                    if dumbbell.weight() == requirement.weight() {
+        // Convert the complete path to the expected result format
+        let mut result = HashMap::new();
+        let mut requirement_index = 0;
+
+        for (path_index, &state_id) in complete_path.iter().enumerate() {
+            let state = &self.states[state_id.0];
+
+            if path_index == 0 {
+                // Starting position - add empty dumbbells
+                for (bar, dumbbell) in state.value() {
+                    if dumbbell.plates().is_empty() {
                         result.entry(*bar).or_insert_with(Vec::new).push(dumbbell);
-                        break; // Only add one dumbbell per requirement
+                    }
+                }
+            } else {
+                // Check if this state satisfies the next requirement
+                if requirement_index < requirements.len() {
+                    let requirement = requirements[requirement_index];
+                    let bars = &self.bar_options[&requirement.bar_kind()];
+
+                    for bar in bars {
+                        if let Some(dumbbell) = state.get(bar) {
+                            if dumbbell.weight() == requirement.weight() {
+                                result.entry(*bar).or_insert_with(Vec::new).push(dumbbell);
+                                requirement_index += 1;
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -183,35 +200,44 @@ impl Gym {
     }
 
     /// Find all gym states that satisfy a given requirement
+    /// Returns states sorted by a consistent criteria to ensure deterministic behavior
     fn find_states_for_requirement(
         &self,
         requirement: Requirement,
     ) -> Result<Vec<GymStateId>, GymError> {
-        let matching_states: Vec<GymStateId> = self
+        let mut matching_states: Vec<(GymStateId, u32)> = self
             .states
             .iter()
             .enumerate()
-            .filter(|(_, state)| {
+            .filter_map(|(i, state)| {
                 // Check if any bar of the required kind has a dumbbell with the required weight
-                let bars = &self.bar_options.get(&requirement.bar_kind());
+                let bars = self.bar_options.get(&requirement.bar_kind())?;
 
-                if let Some(bars) = bars {
-                    return bars.iter().any(|bar| {
-                        state
-                            .get(bar)
-                            .is_some_and(|dumbbell| dumbbell.weight() == requirement.weight())
-                    });
+                for bar in bars {
+                    if let Some(dumbbell) = state.get(bar) {
+                        if dumbbell.weight() == requirement.weight() {
+                            // Calculate a "complexity score" for consistent ordering
+                            // States with fewer total plates are preferred (simpler states)
+                            let total_plates: u32 = state.value().values()
+                                .map(|d| d.plates().len() as u32)
+                                .sum();
+                            return Some((GymStateId(i), total_plates));
+                        }
+                    }
                 }
-
-                false
+                None
             })
-            .map(|(i, _)| GymStateId(i))
             .collect();
 
         if matching_states.is_empty() {
             Err(GymError::InvalidRequirement(requirement))
         } else {
-            Ok(matching_states)
+            // Sort by complexity (fewer plates first) then by state ID for determinism
+            matching_states.sort_by(|(id1, plates1), (id2, plates2)| {
+                plates1.cmp(plates2).then_with(|| id1.0.cmp(&id2.0))
+            });
+
+            Ok(matching_states.into_iter().map(|(id, _)| id).collect())
         }
     }
 
@@ -288,5 +314,77 @@ impl Gym {
 
         path.reverse();
         Ok(path)
+    }
+
+    /// Get the complete path including all intermediate transitions
+    /// This ensures we don't skip any necessary plate changes
+    fn get_complete_transition_path(
+        &self,
+        optimal_sequence: &[GymStateId],
+        distances: &HashMap<(NodeIndex, NodeIndex), u32>,
+    ) -> std::vec::Vec<GymStateId> {
+        if optimal_sequence.is_empty() {
+            return vec![GymStateId(0)]; // Just return the starting state
+        }
+
+        let mut complete_path = vec![GymStateId(0)]; // Start with empty state
+
+        for &target_state in optimal_sequence {
+            let current_state = *complete_path.last().unwrap();
+
+            if current_state != target_state {
+                // Find the actual shortest path between current and target states
+                let intermediate_path = self.find_shortest_path_between_states(
+                    current_state,
+                    target_state,
+                    distances
+                );
+
+                // Add intermediate states (skip the first one as it's already in complete_path)
+                complete_path.extend(intermediate_path.into_iter().skip(1));
+            }
+        }
+
+        complete_path
+    }
+
+    /// Find the actual shortest path between two specific states
+    fn find_shortest_path_between_states(
+        &self,
+        start: GymStateId,
+        end: GymStateId,
+        distances: &HashMap<(NodeIndex, NodeIndex), u32>,
+    ) -> std::vec::Vec<GymStateId> {
+        if start == end {
+            return vec![start];
+        }
+
+        let start_node = self.nodes[&start];
+        let end_node = self.nodes[&end];
+
+        // Use A* to find the actual path (not just the distance)
+        if let Some((_, path)) = algo::astar(
+            &self.graph,
+            start_node,
+            |n| n == end_node,
+            |e| *e.weight(),
+            |_| 0, // No heuristic needed since all edges have weight 1
+        ) {
+            // Convert node path back to state IDs
+            let state_path: Vec<GymStateId> = path
+                .into_iter()
+                .filter_map(|node| {
+                    // Find the state ID for this node
+                    self.nodes.iter()
+                        .find(|(_, n)| **n == node)
+                        .map(|(&state_id, _)| state_id)
+                })
+                .collect();
+
+            state_path
+        } else {
+            // Fallback: if no path found, just return the start and end states
+            vec![start, end]
+        }
     }
 }
