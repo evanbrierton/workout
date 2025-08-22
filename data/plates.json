@@ -1,0 +1,47 @@
+[
+  {
+    "gauge": 1,
+    "weight": 500,
+    "quantity": 4
+  },
+  {
+    "gauge": 1,
+    "weight": 1250,
+    "quantity": 4
+  },
+  {
+    "gauge": 1,
+    "weight": 2500,
+    "quantity": 4
+  },
+  {
+    "gauge": 2,
+    "weight": 1250,
+    "quantity": 8
+  },
+  {
+    "gauge": 2,
+    "weight": 2500,
+    "quantity": 12
+  },
+  {
+    "gauge": 2,
+    "weight": 5000,
+    "quantity": 2
+  },
+  {
+    "gauge": 2,
+    "weight": 10000,
+    "quantity": 2
+  },
+  {
+    "gauge": 2,
+    "weight": 15000,
+    "quantity": 2
+  },
+  {
+    "gauge": 2,
+    "weight": 20000,
+    "quantity": 2
+  }
+]
