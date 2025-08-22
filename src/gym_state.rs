@@ -45,11 +45,6 @@ impl GymState {
     }
 
     #[must_use]
-    pub fn value(&self) -> &HashMap<Bar, Dumbbell> {
-        &self.state
-    }
-
-    #[must_use]
     pub fn get(&self, bar: &Bar) -> Option<&Dumbbell> {
         self.state.get(bar)
     }

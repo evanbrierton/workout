@@ -4,9 +4,6 @@ use itertools::Itertools;
 
 use crate::{bar::Bar, plate::Plate};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
-pub struct DumbbellId(pub usize);
-
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 
 pub struct Dumbbell {
