@@ -1,4 +1,4 @@
-use std::{fmt::Display, hash::Hash, rc::Rc};
+use std::{fmt::Display, hash::Hash};
 
 use itertools::Itertools;
 
@@ -26,8 +26,8 @@ impl Dumbbell {
     }
 
     #[must_use]
-    pub fn new_rc(plates: Vec<Plate>, bar: &Bar) -> Rc<Self> {
-        Rc::new(Dumbbell::new(plates, *bar))
+    pub fn plates_owned(self) -> Vec<Plate> {
+        self.plates
     }
 
     #[must_use]

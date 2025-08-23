@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use anyhow::Ok;
 use clap::Parser;
 use itertools::Itertools;
-use workout_rs::{bar::Bar, bar_kind::BarKind, gym::Gym, plate::Plate, requirement::Requirement};
+use workout_rs::{
+    bar::Bar, bar_kind::BarKind, gym::Gym, plate::Plate,
+    requirement::Requirement,
+};
 
 #[derive(Parser)]
 struct Args {
@@ -31,7 +34,7 @@ fn main() -> anyhow::Result<()> {
     let plates = small_plates
         .into_iter()
         .chain(big_plates)
-        .collect::<HashMap<_, _>>();
+        .collect::<Vec<_>>();
 
     let bars = vec![
         Bar::new(2000, 1, BarKind::Dumbbell),
@@ -39,15 +42,15 @@ fn main() -> anyhow::Result<()> {
         Bar::new(15000, 2, BarKind::Barbell),
     ];
 
-    process_bars(&plates, &bars, &args.requirements)?;
+    process_bars(plates, bars, args.requirements)?;
 
     Ok(())
 }
 
 fn process_bars(
-    plates: &HashMap<Plate, usize>,
-    bars: &[Bar],
-    requirements: &[Requirement],
+    plates: Vec<Plate>,
+    bars: Vec<Bar>,
+    requirements: Vec<Requirement>,
 ) -> anyhow::Result<()> {
     let gym = Gym::new(plates, bars);
 
@@ -68,8 +71,8 @@ fn process_bars(
             }
         }
         false => {
-            let ordered_dumbbells = gym.order(requirements)?;
-            for (bar, dumbbells) in ordered_dumbbells {
+            let workout = gym.workout(requirements)?;
+            for (bar, dumbbells) in workout {
                 println!("{bar}");
                 for dumbbell in dumbbells {
                     println!("  - {dumbbell}");

@@ -14,6 +14,16 @@ impl BarKind {
             BarKind::Barbell => 2,
         }
     }
+
+    #[must_use]
+    pub fn dumbbell() -> Self {
+        BarKind::Dumbbell
+    }
+
+    #[must_use]
+    pub fn barbell() -> Self {
+        BarKind::Barbell
+    }
 }
 
 impl Display for BarKind {

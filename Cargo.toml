@@ -7,5 +7,8 @@ edition = "2024"
 anyhow = "1.0.99"
 clap = { version = "4.5.41", features = ["derive"] }
 itertools = "0.14.0"
+multimap = "0.10.1"
 petgraph = "0.8.2"
+swift-bridge = "0.1.57"
+swift-bridge-build = "0.1.57"
 thiserror = "2.0.16"

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, iter::repeat_n};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Plate {
@@ -23,15 +23,11 @@ impl Plate {
     }
 
     #[must_use]
-    pub fn from_weights(weights: Vec<u32>, gauge: u32) -> Vec<Plate> {
-        weights.into_iter().map(|w| Plate::new(w, gauge)).collect()
-    }
-
-    #[must_use]
-    pub fn from_weights_map(weights_map: HashMap<u32, usize>, gauge: u32) -> HashMap<Plate, usize> {
+    pub fn from_weights_map(weights_map: HashMap<u32, usize>, gauge: u32) -> Vec<Plate> {
         weights_map
             .into_iter()
             .map(|(weight, count)| (Plate::new(weight, gauge), count))
+            .flat_map(|(plate, count)| repeat_n(plate, count))
             .collect()
     }
 }

@@ -11,6 +11,7 @@ use crate::{
     gym_state::{GymState, GymStateId},
     plate::Plate,
     requirement::Requirement,
+    workout::Workout,
 };
 
 pub struct Gym {
@@ -22,10 +23,17 @@ pub struct Gym {
 
 impl Gym {
     #[must_use]
-    pub fn new(plates: &HashMap<Plate, usize>, bars: &[Bar]) -> Self {
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn new(plates: Vec<Plate>, bars: Vec<Bar>) -> Self {
+        let plate_counts: HashMap<Plate, usize> =
+            plates.iter().fold(HashMap::new(), |mut acc, plate| {
+                *acc.entry(*plate).or_default() += 1;
+                acc
+            });
+
         let dumbbells: HashMap<Bar, Vec<Dumbbell>> = bars
             .iter()
-            .map(|bar| (*bar, Self::dumbbells(plates, bar)))
+            .map(|bar| (*bar, Self::dumbbells(&plate_counts, bar)))
             .collect();
 
         let weights = dumbbells
@@ -96,37 +104,43 @@ impl Gym {
         }
     }
 
-    ///
-    /// # Errors
-    /// If it is impossible to construct a dumbbell for a requirement given the user's plates.
-    ///
-    pub fn order(
-        &self,
-        requirements: &[Requirement],
-    ) -> Result<HashMap<Bar, Vec<&Dumbbell>>, GymError> {
-        let requirements_by_kind: HashMap<BarKind, Vec<Requirement>> =
-            requirements.iter().fold(HashMap::new(), |mut acc, req| {
-                acc.entry(req.bar_kind()).or_default().push(*req);
-                acc
-            });
-
-        let mut result = HashMap::<Bar, Vec<&Dumbbell>>::new();
-
-        for (bar_kind, reqs) in requirements_by_kind {
-            let ordered_dumbbells = self.order_by_kind(bar_kind, &reqs)?;
-            for (bar, dumbbells) in ordered_dumbbells {
-                result.entry(bar).or_default().extend(dumbbells);
-            }
-        }
-
-        Ok(result)
+    #[must_use]
+    pub fn weights(&self) -> &HashMap<Bar, Vec<u32>> {
+        &self.weights
     }
 
     ///
     /// # Errors
     /// If it is impossible to construct a dumbbell for a requirement given the user's plates.
     ///
-    pub fn order_by_kind(
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn workout(&self, requirements: Vec<Requirement>) -> Result<Workout, GymError> {
+        let requirements_by_kind: HashMap<BarKind, Vec<Requirement>> =
+            requirements.iter().fold(HashMap::new(), |mut acc, req| {
+                acc.entry(req.bar_kind()).or_default().push(*req);
+                acc
+            });
+
+        let mut result = HashMap::<Bar, Vec<Dumbbell>>::new();
+
+        for (bar_kind, reqs) in requirements_by_kind {
+            let ordered_dumbbells = self.order_by_kind(bar_kind, &reqs)?;
+            for (bar, dumbbells) in ordered_dumbbells {
+                result
+                    .entry(bar)
+                    .or_default()
+                    .extend(dumbbells.into_iter().cloned().collect::<Vec<_>>());
+            }
+        }
+
+        Ok(Workout::new(result))
+    }
+
+    ///
+    /// # Errors
+    /// If it is impossible to construct a dumbbell for a requirement given the user's plates.
+    ///
+    fn order_by_kind(
         &self,
         bar_kind: BarKind,
         requirements: &[Requirement],
@@ -163,11 +177,6 @@ impl Gym {
         }
 
         Ok(result)
-    }
-
-    #[must_use]
-    pub fn weights(&self) -> &HashMap<Bar, Vec<u32>> {
-        &self.weights
     }
 
     fn dumbbells(weights_map: &HashMap<Plate, usize>, bar: &Bar) -> Vec<Dumbbell> {
