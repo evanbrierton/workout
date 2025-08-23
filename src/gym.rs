@@ -3,8 +3,7 @@ use std::collections::HashSet;
 use hashbrown::HashMap;
 use itertools::Itertools;
 use petgraph::{
-    algo,
-    graph::{NodeIndex, UnGraph},
+    algo, prelude::UnGraphMap,
 };
 
 use crate::{
@@ -19,8 +18,7 @@ use crate::{
 
 pub struct Gym {
     states: Vec<GymState>,
-    graph: UnGraph<GymStateId, u32>,
-    nodes: HashMap<GymStateId, NodeIndex>,
+    graph: UnGraphMap<GymStateId, u32>,
     weights: HashMap<Bar, Vec<u32>>,
     bar_options: HashMap<BarKind, Vec<Bar>>,
 }
@@ -66,7 +64,7 @@ impl Gym {
             .map(|(i, _)| GymStateId(i))
             .collect::<HashSet<_>>();
 
-        let (graph, nodes) = Self::graph(&states, &ids);
+        let graph = Self::graph(&states, &ids);
 
         let bar_options: HashMap<BarKind, Vec<Bar>> =
             bars.iter().fold(HashMap::new(), |mut acc, bar| {
@@ -77,7 +75,6 @@ impl Gym {
         Gym {
             states,
             graph,
-            nodes,
             weights,
             bar_options,
         }
@@ -156,25 +153,20 @@ impl Gym {
     fn graph(
         states: &[GymState],
         ids: &HashSet<GymStateId>,
-    ) -> (UnGraph<GymStateId, u32>, HashMap<GymStateId, NodeIndex>) {
-        let mut graph = UnGraph::<GymStateId, u32>::new_undirected();
-        let mut nodes = HashMap::new();
+    ) -> UnGraphMap<GymStateId, u32> {
+        let mut graph = UnGraphMap::<GymStateId, u32>::new();
 
         for id in ids {
-            let node_index = graph.add_node(*id);
-            nodes.insert(*id, node_index);
+            graph.add_node(*id);
         }
 
         for ((i1, state1), (i2, state2)) in states.iter().enumerate().tuple_combinations() {
             if state1.adjacent(state2) {
-                let n1 = nodes[&GymStateId(i1)];
-                let n2 = nodes[&GymStateId(i2)];
-
-                graph.add_edge(n1, n2, 1);
+                graph.add_edge(GymStateId(i1), GymStateId(i2), 1);
             }
         }
 
-        (graph, nodes)
+        graph
     }
 
     fn find_states_for_requirement(&self, requirement: Requirement) -> Vec<GymStateId> {
@@ -220,8 +212,8 @@ impl Gym {
             _ => {}
         }
 
-        let distances: HashMap<(NodeIndex, NodeIndex), u32> =
-            algo::johnson(&self.graph, |e| *e.weight())
+        let distances: HashMap<(GymStateId, GymStateId), u32> =
+            algo::johnson(&self.graph, |e| *e.2)
                 .map_err(|_| GymError::InvalidRequirement(requirements[0]))?;
 
         let mut dp: Vec<HashMap<GymStateId, (u32, Option<GymStateId>)>> = vec![HashMap::new(); n];
@@ -232,7 +224,6 @@ impl Gym {
 
         for i in 1..n {
             for &current_state in &requirement_states[i] {
-                let current_node = self.nodes[&current_state];
                 let mut min_cost = u32::MAX;
                 let mut best_prev = None;
 
@@ -243,8 +234,7 @@ impl Gym {
                 prev_states.sort_by_key(|&(state, _)| state);
 
                 for (prev_state, prev_cost) in prev_states {
-                    let prev_node = self.nodes[&prev_state];
-                    if let Some(&transition_cost) = distances.get(&(prev_node, current_node)) {
+                    if let Some(&transition_cost) = distances.get(&(prev_state, current_state)) {
                         let total_cost = prev_cost.saturating_add(transition_cost);
 
                         if total_cost < min_cost {

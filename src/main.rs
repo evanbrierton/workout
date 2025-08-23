@@ -97,13 +97,7 @@ fn process_bars(
             }
         }
         false => {
-            let filtered_requirements = requirements
-                .iter()
-                .copied()
-                .filter(|req| req.bar_kind() == kind)
-                .collect::<Vec<_>>();
-
-            let ordered_dumbbells = gym.order(&filtered_requirements)?;
+            let ordered_dumbbells = gym.order(&relevant_requirements)?;
             for (bar, dumbbells) in ordered_dumbbells {
                 println!("{bar}");
                 for dumbbell in dumbbells {
