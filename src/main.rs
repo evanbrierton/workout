@@ -1,4 +1,4 @@
-use hashbrown::HashMap;
+use std::collections::HashMap;
 
 use anyhow::Ok;
 use clap::Parser;
@@ -39,45 +39,16 @@ fn main() -> anyhow::Result<()> {
         Bar::new(15000, 2, BarKind::Barbell),
     ];
 
-    let bars = bars
-        .into_iter()
-        .chunk_by(|bar| *bar.kind())
-        .into_iter()
-        .map(|(kind, bars)| (kind, bars.collect::<Vec<_>>()))
-        .sorted_by_key(|(kind, _)| *kind)
-        .collect::<Vec<_>>();
-
-    match bars.is_empty() {
-        true => {
-            println!("No bars available.");
-        }
-        false => {
-            for (kind, bars) in bars {
-                process_bars(kind, &plates, &bars, &args.requirements)?;
-            }
-
-        }
-    }
+    process_bars(&plates, &bars, &args.requirements)?;
 
     Ok(())
 }
 
 fn process_bars(
-    kind: BarKind,
     plates: &HashMap<Plate, usize>,
     bars: &[Bar],
     requirements: &[Requirement],
 ) -> anyhow::Result<()> {
-    let relevant_requirements = requirements
-        .iter()
-        .copied()
-        .filter(|req| req.bar_kind() == kind)
-        .collect::<Vec<_>>();
-
-    if relevant_requirements.is_empty() {
-        return Ok(());
-    }
-
     let gym = Gym::new(plates, bars);
 
     match requirements.is_empty() {
@@ -97,7 +68,7 @@ fn process_bars(
             }
         }
         false => {
-            let ordered_dumbbells = gym.order(&relevant_requirements)?;
+            let ordered_dumbbells = gym.order(requirements)?;
             for (bar, dumbbells) in ordered_dumbbells {
                 println!("{bar}");
                 for dumbbell in dumbbells {

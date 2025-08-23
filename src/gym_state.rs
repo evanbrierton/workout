@@ -1,6 +1,4 @@
-use std::fmt::Display;
-
-use hashbrown::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use crate::{bar::Bar, dumbbell::Dumbbell};
 

@@ -1,10 +1,7 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
-use hashbrown::HashMap;
 use itertools::Itertools;
-use petgraph::{
-    algo, prelude::UnGraphMap,
-};
+use petgraph::{algo, prelude::UnGraphMap};
 
 use crate::{
     bar::Bar,
@@ -17,8 +14,8 @@ use crate::{
 };
 
 pub struct Gym {
-    states: Vec<GymState>,
-    graph: UnGraphMap<GymStateId, u32>,
+    states: HashMap<BarKind, Vec<GymState>>,
+    graphs: HashMap<BarKind, UnGraphMap<GymStateId, u32>>,
     weights: HashMap<Bar, Vec<u32>>,
     bar_options: HashMap<BarKind, Vec<Bar>>,
 }
@@ -44,17 +41,30 @@ impl Gym {
             })
             .collect();
 
-        let states: Vec<_> = dumbbells
+        let dumbbells: HashMap<BarKind, HashMap<Bar, Vec<Dumbbell>>> =
+            dumbbells
+                .into_iter()
+                .fold(HashMap::new(), |mut acc, (bar, dumbbells)| {
+                    acc.entry(*bar.kind()).or_default().insert(bar, dumbbells);
+                    acc
+                });
+
+        let states: HashMap<BarKind, Vec<GymState>> = dumbbells
             .into_iter()
-            .map(|(_, d)| d)
-            .multi_cartesian_product()
-            .map(|dumbbells| {
-                GymState::new(
-                    dumbbells
-                        .into_iter()
-                        .map(|dumbbell| (*dumbbell.bar(), dumbbell))
-                        .collect::<HashMap<_, _>>(),
-                )
+            .map(|(kind, dumbbells)| {
+                let states = dumbbells
+                    .into_values()
+                    .multi_cartesian_product()
+                    .map(|dumbbells| {
+                        GymState::new(
+                            dumbbells
+                                .into_iter()
+                                .map(|dumbbell| (*dumbbell.bar(), dumbbell))
+                                .collect::<HashMap<_, _>>(),
+                        )
+                    })
+                    .collect();
+                (kind, states)
             })
             .collect();
 
@@ -64,7 +74,13 @@ impl Gym {
             .map(|(i, _)| GymStateId(i))
             .collect::<HashSet<_>>();
 
-        let graph = Self::graph(&states, &ids);
+        let graphs = states
+            .iter()
+            .map(|(kind, states)| {
+                let graph = Self::graph(states, &ids);
+                (*kind, graph)
+            })
+            .collect();
 
         let bar_options: HashMap<BarKind, Vec<Bar>> =
             bars.iter().fold(HashMap::new(), |mut acc, bar| {
@@ -74,7 +90,7 @@ impl Gym {
 
         Gym {
             states,
-            graph,
+            graphs,
             weights,
             bar_options,
         }
@@ -88,17 +104,44 @@ impl Gym {
         &self,
         requirements: &[Requirement],
     ) -> Result<HashMap<Bar, Vec<&Dumbbell>>, GymError> {
+        let requirements_by_kind: HashMap<BarKind, Vec<Requirement>> =
+            requirements.iter().fold(HashMap::new(), |mut acc, req| {
+                acc.entry(req.bar_kind()).or_default().push(*req);
+                acc
+            });
+
+        let mut result = HashMap::<Bar, Vec<&Dumbbell>>::new();
+
+        for (bar_kind, reqs) in requirements_by_kind {
+            let ordered_dumbbells = self.order_by_kind(bar_kind, &reqs)?;
+            for (bar, dumbbells) in ordered_dumbbells {
+                result.entry(bar).or_default().extend(dumbbells);
+            }
+        }
+
+        Ok(result)
+    }
+
+    ///
+    /// # Errors
+    /// If it is impossible to construct a dumbbell for a requirement given the user's plates.
+    ///
+    pub fn order_by_kind(
+        &self,
+        bar_kind: BarKind,
+        requirements: &[Requirement],
+    ) -> Result<HashMap<Bar, Vec<&Dumbbell>>, GymError> {
         if requirements.is_empty() {
             return Ok(HashMap::new());
         }
 
-        let optimal_sequence = self.find_optimal_sequence(requirements)?;
+        let optimal_sequence = self.find_optimal_sequence(bar_kind, requirements)?;
 
         let mut result = HashMap::<Bar, Vec<&Dumbbell>>::new();
         let mut requirement_index = 0;
 
         for state_id in optimal_sequence {
-            let state = &self.states[state_id.0];
+            let state = &self.states[&bar_kind][state_id.0];
             let bars = self
                 .bar_options
                 .get(&requirements[requirement_index].bar_kind())
@@ -150,10 +193,7 @@ impl Gym {
             .collect::<HashSet<_>>()
     }
 
-    fn graph(
-        states: &[GymState],
-        ids: &HashSet<GymStateId>,
-    ) -> UnGraphMap<GymStateId, u32> {
+    fn graph(states: &[GymState], ids: &HashSet<GymStateId>) -> UnGraphMap<GymStateId, u32> {
         let mut graph = UnGraphMap::<GymStateId, u32>::new();
 
         for id in ids {
@@ -170,8 +210,7 @@ impl Gym {
     }
 
     fn find_states_for_requirement(&self, requirement: Requirement) -> Vec<GymStateId> {
-        let matching_states: Vec<(GymStateId, usize)> = self
-            .states
+        let matching_states: Vec<(GymStateId, usize)> = self.states[&requirement.bar_kind()]
             .iter()
             .enumerate()
             .filter_map(|(i, state)| {
@@ -197,6 +236,7 @@ impl Gym {
 
     fn find_optimal_sequence(
         &self,
+        bar_kind: BarKind,
         requirements: &[Requirement],
     ) -> Result<Vec<GymStateId>, GymError> {
         let requirement_states: Vec<Vec<GymStateId>> = requirements
@@ -208,13 +248,21 @@ impl Gym {
 
         match n {
             0 => return Ok(vec![]),
-            1 => return requirement_states[0].iter().min_by_key(|id| self.states[id.0].clone()).ok_or(GymError::InvalidRequirement(requirements[0])).map(|id| vec![*id]),
+            1 => {
+                return requirement_states[0]
+                    .iter()
+                    .min_by_key(|id| self.states[&bar_kind][id.0].clone())
+                    .ok_or(GymError::InvalidRequirement(requirements[0]))
+                    .map(|id| vec![*id]);
+            }
             _ => {}
         }
 
         let distances: HashMap<(GymStateId, GymStateId), u32> =
-            algo::johnson(&self.graph, |e| *e.2)
-                .map_err(|_| GymError::InvalidRequirement(requirements[0]))?;
+            algo::johnson(&self.graphs[&bar_kind], |e| *e.2)
+                .map_err(|_| GymError::InvalidRequirement(requirements[0]))?
+                .into_iter()
+                .collect();
 
         let mut dp: Vec<HashMap<GymStateId, (u32, Option<GymStateId>)>> = vec![HashMap::new(); n];
 
